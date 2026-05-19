@@ -15,6 +15,13 @@ import { Palette, css } from "@/art/palette";
 import { getLocale, setLocale, t, type Locale } from "@/i18n";
 import { AudioSystem } from "@/systems/AudioSystem";
 import { attachMuteIndicator } from "@/systems/MuteIndicator";
+import {
+  SELECTABLE_STYLES,
+  STYLE_LABEL,
+  getArtStyle,
+  setArtStyle,
+  type ArtStyle,
+} from "@/art/sprites";
 
 export class TitleScene extends Phaser.Scene {
   private audio!: AudioSystem;
@@ -109,6 +116,9 @@ export class TitleScene extends Phaser.Scene {
     // --- Language toggle (top-right) -------------------------------------
     this.buildLanguageToggle(width);
 
+    // --- Art-style switcher (bottom-left) --------------------------------
+    this.buildArtStyleSwitcher(height);
+
     const begin = (): void => {
       this.scene.start(SceneKey.Intro);
     };
@@ -181,5 +191,84 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(1, 0)
       .setAlpha(0.5);
     makeLabel("en", "EN", dividerX - 10);
+  }
+
+  /**
+   * Bottom-left switcher between art-style providers. Active style is gold/bold;
+   * inactive styles dimmed cream. Clicking a label persists the choice and
+   * triggers a full page reload (sprite textures are baked once at BootScene,
+   * so a reload is the cleanest way to swap the whole asset set).
+   *
+   * Only `SELECTABLE_STYLES` are shown — `handdrawn` is intentionally hidden;
+   * it remains as a silent fallback used by the gemini / chatgpt cascade.
+   */
+  private buildArtStyleSwitcher(height: number): void {
+    const active = getArtStyle();
+    const leftPad = 28;
+    const baseY = height - 28;
+
+    // Caption above the row.
+    this.add
+      .text(leftPad, baseY - 22, "Art style", {
+        fontFamily: "Georgia, serif",
+        fontSize: "12px",
+        color: css(Palette.cream),
+      })
+      .setOrigin(0, 0)
+      .setAlpha(0.7);
+
+    const makeLabel = (
+      style: ArtStyle,
+      label: string,
+      x: number,
+    ): Phaser.GameObjects.Text => {
+      const isActive = style === active;
+      const txt = this.add.text(x, baseY, label, {
+        fontFamily: "Georgia, serif",
+        fontSize: "16px",
+        fontStyle: isActive ? "bold" : "normal",
+        color: isActive ? css(Palette.gold) : css(Palette.cream),
+      });
+      txt.setOrigin(0, 0);
+      txt.setAlpha(isActive ? 1 : 0.5);
+      txt.setInteractive({ useHandCursor: true });
+      txt.on(
+        "pointerdown",
+        (
+          _pointer: Phaser.Input.Pointer,
+          _x: number,
+          _y: number,
+          event?: { stopPropagation: () => void },
+        ) => {
+          // Don't let this click also fire the global "begin" handler.
+          if (event && typeof event.stopPropagation === "function") {
+            event.stopPropagation();
+          }
+          if (style === getArtStyle()) return;
+          setArtStyle(style);
+          // Full reload — BootScene re-bakes textures with the new style.
+          window.location.reload();
+        },
+      );
+      return txt;
+    };
+
+    // Layout left to right with " | " dividers.
+    let cursorX = leftPad;
+    SELECTABLE_STYLES.forEach((style, idx) => {
+      const lbl = makeLabel(style, STYLE_LABEL[style], cursorX);
+      cursorX += lbl.width + 6;
+      if (idx < SELECTABLE_STYLES.length - 1) {
+        const divider = this.add
+          .text(cursorX, baseY, "|", {
+            fontFamily: "Georgia, serif",
+            fontSize: "16px",
+            color: css(Palette.cream),
+          })
+          .setOrigin(0, 0)
+          .setAlpha(0.5);
+        cursorX += divider.width + 6;
+      }
+    });
   }
 }

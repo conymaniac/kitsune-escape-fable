@@ -12,9 +12,18 @@
  * expose `preloadAllSprites(scene)` so BootScene can queue async file loads
  * in its preload phase.
  *
- * To pick a style: change `ART_STYLE` below, or set
- *   `window.KITSUNE_ART_STYLE = "procedural" | "handdrawn" | "gemini" | "chatgpt"`
- * in the browser console BEFORE the page is reloaded.
+ * Style selection (in precedence order):
+ *   1. `window.KITSUNE_ART_STYLE = "procedural" | "gemini" | "chatgpt" | "handdrawn"`
+ *      — runtime override in the dev console (set BEFORE the page reloads).
+ *   2. `localStorage["kitsune-art-style"]` — persisted user pick from the
+ *      Title-screen UI switcher.
+ *   3. The DEFAULT_STYLE constant defined below.
+ *
+ * Public API:
+ *   - getArtStyle() / setArtStyle(s)   — read & persist the active style
+ *   - SELECTABLE_STYLES / STYLE_LABEL  — drive the Title-screen switcher
+ *   - preloadAllSprites(scene)         — queue async PNG loads in preload()
+ *   - generateAllSprites(scene)        — build textures in create()
  *
  * Rollback: any style can fall back to handdrawn/procedural for missing keys.
  */
@@ -33,8 +42,24 @@ import {
 
 export type ArtStyle = "procedural" | "handdrawn" | "gemini" | "chatgpt";
 
-/** Default style. Override at runtime via window.KITSUNE_ART_STYLE. */
-export const ART_STYLE: ArtStyle = "gemini";
+/**
+ * User-facing styles. Used by the in-game switcher on the title screen.
+ * `handdrawn` is intentionally NOT exposed — it remains as a silent fallback
+ * for missing keys inside the gemini / chatgpt cascade.
+ */
+export const SELECTABLE_STYLES: ArtStyle[] = ["procedural", "gemini", "chatgpt"];
+
+/** Display label for the title-screen switcher. */
+export const STYLE_LABEL: Record<ArtStyle, string> = {
+  procedural: "Procedural",
+  handdrawn: "Hand-drawn",
+  gemini: "Gemini",
+  chatgpt: "ChatGPT",
+};
+
+/** Default style if nothing is stored / overridden. */
+const DEFAULT_STYLE: ArtStyle = "gemini";
+const STORAGE_KEY = "kitsune-art-style";
 
 declare global {
   interface Window {
@@ -42,11 +67,54 @@ declare global {
   }
 }
 
-function activeStyle(): ArtStyle {
-  if (typeof window !== "undefined" && window.KITSUNE_ART_STYLE) {
+function isArtStyle(v: unknown): v is ArtStyle {
+  return (
+    v === "procedural" ||
+    v === "handdrawn" ||
+    v === "gemini" ||
+    v === "chatgpt"
+  );
+}
+
+function readStoredStyle(): ArtStyle | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return isArtStyle(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the active art style. Precedence:
+ *   1. window.KITSUNE_ART_STYLE (dev console override)
+ *   2. localStorage["kitsune-art-style"] (user pick from UI switcher)
+ *   3. DEFAULT_STYLE
+ */
+export function getArtStyle(): ArtStyle {
+  if (typeof window !== "undefined" && isArtStyle(window.KITSUNE_ART_STYLE)) {
     return window.KITSUNE_ART_STYLE;
   }
-  return ART_STYLE;
+  const stored = readStoredStyle();
+  if (stored) return stored;
+  return DEFAULT_STYLE;
+}
+
+/**
+ * Persist a new art style. Caller is responsible for triggering a reload —
+ * sprite textures are baked once at BootScene, so a full page reload is the
+ * cleanest way to swap them out.
+ */
+export function setArtStyle(style: ArtStyle): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, style);
+  } catch {
+    // ignore
+  }
+}
+
+function activeStyle(): ArtStyle {
+  return getArtStyle();
 }
 
 /**
