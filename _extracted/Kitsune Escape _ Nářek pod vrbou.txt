@@ -1,0 +1,256 @@
+
+
+NÁŘEK POD VRBOU
+
+napsal Dominik Michna
+
+9. prosince 2023
+
+Doporučená hudba pro dokreslení: 
+[Joe Hisaishi, odkaz na Spotify]
+–––––––––––––––––––––––––––––– SCRIPT QUESTU ––––––––––––––––––––––––––––––
+Následující dialog a quest je dostupný pouze, když nastane noc. Během dne se daný NPC u jezera a na daném místě neobjeví.
+Hráč prochází kolem jezera obehnaného vrbami (Marker type: 2).
+Pod jednou vrbou sedí MLADÁ ŽENA oblečená v dlouhém, fialovém kimonu s květinovými vzory. V náručí drží nemluvně zabalené v šátku.
+Dialog se spustí automaticky, když hráč prochází kolem NPC. Maximální vzdálenost hráče od NPC pro spuštění dialogu přibližně 15 metrů.
+MLADÁ ŽENA (s pláčem)
+Ššš, neplakej maličký. Vítr brzy snad už přestane foukat. A ta prokletá vrba nás snad konečně nechá jít.
+DIALOG 1 START (interakce s ženou)
+HRÁČ
+Můžu vám nějak pomoci?
+MLADÁ ŽENA
+Ach áno, prosím. Malý nechtěl v noci usnout, tak jsem jej vzala ven na čerstvý vzduch. Ale zastihl nás moc silný vítr, tak jsem se ukryla tady pod těmi vrbami.
+HRÁČ
+Podařilo se malému už usnout?
+MLADÁ ŽENA
+Snaží se spinkat, snaží. Ale nejde to. Vrba jej nenechá.
+HRÁČ
+Jak to?
+MLADÁ ŽENA
+To ty její větve. Ach, jak to bolelo, když foukal ten silný vítr. Moc to bolelo.
+HRÁČ
+Co se stalo?
+MLADÁ ŽENA
+Její větve jsou moc dlouhé. Ublížili mi.
+HRÁČ
+Jak to myslíte?
+MLADÁ ŽENA
+To kvůli tomu větru. Větve mě mrskaly. Ach, moje ubohá záda.
+HRÁČ
+Pomůžu vám dostat se domů.
+MLADÁ ŽENA
+To bys byla moc hodná maličká. Ale nevím, jestli to zvládneš.
+HRÁČ
+Proč bych neměla?
+MLADÁ ŽENA
+Mlaďounká liška jako ty by se neměla potulovat nocí.
+HRÁČ
+Já to zvládnu. Nemusíte se o mě bát.
+MLADÁ ŽENA
+Strach je to jediný, co mi už zůstalo. Ach můj maličký, ššš, brzy už to snad skončí, drahoušku.
+HRÁČ
+Co ode mě potřebujete?
+MLADÁ ŽENA
+Kdybys byla tak hodná a došla do mé chaloupky a přinesla mi dýku po mém manželovi, kterou mám schovanou v zásuvce v kuchyni. Zamotala jsem se do dlouhých větví té prokleté vrby a nemám čím bych větve přeřízla, abych se z nich dostala.
+HRÁČ
+Ráda to udělám. Hned budu zpátky.
+
+SIDE QUEST
+Prerequisite: Dialog s ženou plačící u vrby
+Type: Příběh
+Title: Nářek pod vrbou
+Description: Mladá žena se svým malým synem potřebují od tebe, abys jí přinesla dýku z její chaloupky. Zapletla se do větví vrby a nemůže se dostat pryč.
+OBJECTIVE 1 START
+Title: Najdi chaloupku mladé ženy
+Complete condition: Interakce s místem označeným markerem
+Start blockers: Dialog 1 musí být dokončen
+Marker type: 2
+ASSET 1 – Chaloupka ženy plačící u vrby (exteriér)
+appear: absolute start
+disappear: absolute end
+interaction text: Otevřít
+Hráč dorazí na místo označené na mapě. Jde o tradiční chaloupku japonské architektury, primárně z přírodních materiálů, se slaměnou střechou a posuvnými panely, poskládanou bez použití hřebíků a šroubů.
+Při pokusu otevřít dveře:
+HRÁČ
+Nejde to. Vypadá to, že jsou dveře něčím zablokované.
+OBJECTIVE 2
+Title: Dostaň se do chaloupky jiným způsobem
+Complete condition: Proměnění se do liščí podoby a proskočení otevřeným oknem
+Start blockers: Objective 1
+Marker type: None
+ASSET 2 – Otevřené okno
+appear: quest start
+disappear: quest end
+interaction text: none
+Jediný způsob, jak se hráč může dostat do chaloupky, je proměnit se do liščí podoby a proskočit otevřeným oknem. Lze použít kteroukoliv dostupnou podobu kitsune.
+OBJECTIVE 3
+Title: Najdi dýku
+Complete condition: Nalezení dýky, o kterou požádala žena plačící u vrby
+Start blockers: Objective 2
+Marker type: None
+ASSET 3 – Chaloupka ženy plačící u vrby (interiér)
+appear: quest start
+disappear: quest end
+interaction text: none
+Chaloupka je rozdělena na hlavní obytný prostor, který slouží současně i jako ložnice i jídelna, o velikosti čtyř tatami. Dále pak malou vstupní místnost a malou kuchyňku. Všude na zemi jsou tradiční tatami. Jinak je celá chaloupka skromně vybavena.
+Po proskočení oknem do chaloupky se hráč objeví přímo v hlavním obytném prostoru. Může prohledat chaloupku dál v liščí podobě. Ale na některá místa bude mít problém dosáhnout a měl by se proměnit zpět do lidské podoby. 
+ASSET 4 – Nízký jídelní stůl
+appear: quest start
+disappear: quest end
+interaction text: Prozkoumat
+Nízký jídelní stůl se čtyřmi nízkými židlemi. Na stole dva talíře, v každém z nich lžíce. V talíři neidentifikovatelné zbytky jídla v pokročilém stadiu rozkladu a plísně.
+DIALOG 2  (optional, interakce s jídelním stolem)
+HRÁČ
+Fuj, to ale smrdí. Snad tohle nedávala jíst tomu miminku. Nůž ani dýku tu ale nevidím.
+
+ASSET 5 – Futonová postel
+appear: quest start
+disappear: quest end
+interaction text: Prozkoumat
+Neustlaná špinavá futonová postel zanesená prachem. V posteli jsou evidentní skvrny po moči.
+DIALOG 3  (optional, interakce s postelí)
+HRÁČ
+Chlapeček se asi v noci často počůrává. Ale vypadá to, že už tu dlouho spolu nespali ..
+DIALOG 4  (scéna se spustí automaticky po skončení DIALOGU 3)
+Silný vítr bouchne okenicemi u otevřeného okna, vletí do chaloupky a nadzvedne do vzduchu rozházené papíry kolem futonové postele. Papíry se následně pomalým klouzavým pohybem snesou zase zpátky na zem.
+HRÁČ (lekne se okenic a silného větru)
+Ach!
+HRÁČ (cont'd)
+Pitomej vítr.
+ASSET 6 – Listy popsaného papíru
+appear: quest start
+disappear: quest end
+interaction text: Prozkoumat
+READABLE (optional, interakce s listy popsaného papíru)
+Čitelné jsou stěží jen některé řádky a slova.
+Už zase nespí .. stále pláče a jen pláče .. 
+Nevím, co si mám počít .. jsem na to ..  ..  sama ..  
+.. občas pomáhá, když .. …  studený, čerstvý vzduch .. .. 
+Možná ..  mohli někdy ..  procházku
+
+DIALOG 5  (spustí automaticky po prozkoumání ASSET 6) 
+HRÁČ (smutně)
+Chudák, žena. Má to v životě pěkně těžký. Zajímalo by mě, kam se poděl její muž.
+ASSET 7 – Malá kuchyňka
+appear: quest start
+disappear: quest end
+interaction text: Prozkoumat
+Na hlavní obytný prostor navazuje rovnou malá, zašlá kuchyňka. Papírový panel, který ji odděluje je odsunutý. Hráč může rovnou vstoupit.
+Při prozkoumání kuchyňky objeví ženinu dýku.
+ASSET 8 – Dýka
+appear: after interacting with ASSET 7
+disappear: quest end
+interaction text: Vzít
+OBJECTIVE 4
+Title: Vrať se k ženě plačící u vrby
+Complete condition: Interakce s ženou plačící u vrby
+Start blockers: Objective 3
+Marker type: 2
+Hráč má možnost se dostat z chaloupky buď opět v podobě kitsune a najít tak cestu, jak proskočit zpátky oknem ven. Anebo může oddělat sandály blokující posuvné dveře.
+ASSET 9 – Sandály blokující posuvné vstupní dveře
+appear: quest start
+disappear: quest end
+interaction text 1: Prozkoumat (possible after completing Objective 3)
+DIALOG 5  (spustí se při interakci s ASSET 9 pomocí interaction text 1)
+HRÁČ (klekne si, aby si prohlédla sandály)
+Že by je ten silný vítr odfoukl a kvůli tomu nešly otevřít ty dveře?
+ASSET 9 – Sandály blokující posuvné vstupní dveře
+appear: quest start
+disappear: quest end
+interaction text 2: Oddělat (possible after interaction text 1)
+ASSET 10 – Posuvné vstupní dveře
+appear: quest start
+disappear: quest end
+interaction text: Otevřít (possible after completing Objective 3)
+Po opuštění chaloupky má hráč na výběr, zda bude pokračovat v prozkoumávání světa, a nebo bude pokračovat v dokončení objective 4 a celého side questu.
+DIALOG 6  (spustí se při interakci s ženou v rámci dokončení Objective 4)
+MLADÁ ŽENA
+Ach, ty ses vrátila. Máš mou dýku? Ššš, neplakej broučku. Už půjdeme brzo domů.
+HRÁČ
+Ano. Podařilo se mi ji najít.
+MLADÁ ŽENA
+Jsi naše spása, lištičko. Prosím, přesekni větve té prokleté vrby.
+OBJECTIVE 5
+Title: Přeseknout větve vrby
+Complete condition: Přeseknutí větví
+Start blockers: Objective 4
+Marker type: None
+ASSET 11 – Větve prokleté vrby
+appear: objective start
+disappear: objective end
+interaction text: Přeseknout
+DIALOG 7  (spustí se při interakci s ASSET 11)
+MLADÁ ŽENA
+Děkuji ti má drahá. Konečně můžeme domů. A maličký už bude moci v klidu spát.
+Po skončení dialogu 7 se mladá žena spolu se svým synem promění v bílý kouř a zafoukáním větru se pomalu rozplyne.
+OBJECTIVE 6
+Title: Prohledej okolí vrby
+Complete condition: Interakce s Asset 12
+Start blockers: Objective 5
+Marker type: None
+ASSET 12 – Mrtvé tělo ženy
+appear: objective start
+disappear: objective end
+interaction text: Prozkoumat
+Při prozkoumání hráč zjistí, že žena se už dávno na větvích vrby uškrtila. Stav mrtvého těla napovídá, že se tak nestalo nedávno, ale už to bude podstatně delší doba. Kůže na těle je vysušená a svrasklá. Kolem krku má zamotané větve vrby. V rukou držící prázdný šátek.
+Splněním questu se hráči odemkne medailon s názvem Yanagi onna.
+––––––––––––––––––––– QUEST SUCCESSFULLY COMPLETED ––––––––––––––––––––––
+
+Yokai: Yanagi onna (柳女, やなぎおんな)
+Source, reference: https://yokai.com/yanagionna/
+
+––––––––––––––––––––––––––––––––––––––––––––––––––– ASSET DESIGN –––––––––––––––––––––––––––––––––––––––––––––––––––
+
+Asset no.
+Asset name
+Reference pictures
+Objective
+ASSET 1
+Chaloupka ženy plačící u vrby (exteriér)
+
+Objective 1
+ASSET 2
+Otevřené okno
+
+Objective 2
+ASSET 3
+Chaloupka ženy plačící u vrby (interiér)
+
+Objective 3
+ASSET 4
+Nízký jídelní stůl s židlemi a nádobím
+
+Objective 3
+ASSET 5
+Futonová postel
+
+Objective 3
+ASSET 6
+Listy popsaného papíru
+
+Objective 3
+ASSET 7
+Malá kuchyňka
+
+Objective 3
+ASSET 8
+Dýka
+
+Objective 3
+ASSET 9
+Sandály
+
+Objective 4
+ASSET 10
+Posuvné dveře
+
+Objective 4
+ASSET 11
+Větve prokleté vrby
+
+Objective 5
+ASSET 12
+Mrtvé tělo ženy
+
+Objective 6
+

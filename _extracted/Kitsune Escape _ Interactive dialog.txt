@@ -1,0 +1,91 @@
+
+Interaktivní dialog
+Noc. Hráč prochází kolem jezera obehnaného vrbami.
+Pod jednou z vrb sedí MLADÁ ŽENA oblečená v dlouhém, fialovém kimonu s květinovými vzory. V náručí drží nemluvně zabalené v šátku.
+MLADÁ ŽENA (s pláčem)
+Ššš, neplakej maličký. Vítr brzy snad už přestane foukat. A ta prokletá vrba nás snad konečně nechá jít.
+DIALOG START (interakce s ženou)
+HRÁČ
+Dialogová možnost A1: Můžu vám nějak pomoci?
+Dialogová možnost Z1: Opatrujte se.
+
+MLADÁ ŽENA
+Odpověď na možnost A1: Ach áno, prosím. Malý nechtěl v noci usnout, tak jsem jej vzala ven na čerstvý vzduch. Ale zastihl nás moc silný vítr, tak jsem se ukryla tady pod těmi vrbami.
+
+HRÁČ
+Dialogová možnost B1: Proč se už nevrátíte domů?
+Dialogová možnost B2: Jak daleko to máte domů?
+Dialogová možnost B3: Podařilo se malému už usnout?
+Dialogová možnost Z1: Opatrujte se.
+
+MLADÁ ŽENA
+Odpověď na možnost B1: Nemůžeme, nejde to. Ta prokletá vrba nás nenechá jít.
+Odpověď na možnost B2: Kousíček. Bydlíme nedaleko. Ale ach ta prokletá vrba.
+Odpověď na možnost B3: Snaží se spinkat, snaží. Ale nejde to. Vrba jej nenechá.
+
+HRÁČ
+Pokračování na odpověď k možnosti B1 (C1): Jak to?
+Pokračování na odpověď k možnostem B2, B3 (C2): Co je špatně s tou vrbou?
+Dialogová možnost C3: Pomůžu vám dostat se domů.
+Dialogová možnost Z1: Opatrujte se.
+MLADÁ ŽENA
+Odpověď na možnosti C1 i C2: Ach, jak to bolelo, když foukal ten silný vítr. Moc to bolelo.
+Odpověď na možnost C3: To bys byla moc hodná maličká. Ale nevím, jestli to zvládneš.
+
+HRÁČ
+Pokračování na odpověď k možnostem C1 i C2 (D1): Co se stalo?
+Pokračování na odpověď k možnosti C3 (D2): Proč bych neměla?
+Dialogová možnost Z1: Opatrujte se.
+
+MLADÁ ŽENA
+Odpověď na možnost D1: Její větve jsou moc dlouhé. Ublížili mi.
+Odpověď na možnost D2: Mlaďounká liška jako ty by se neměla potulovat nocí.
+
+HRÁČ
+Pokračování na odpověď k možnosti D1 (E1): Jak to myslíte?
+Pokračování na odpověď k možnosti D2 (E2): Já to zvládnu. Nemusíte se o mě bát.
+Dialogová možnost Z1: Opatrujte se.
+
+MLADÁ ŽENA
+Odpověď na možnost E1: To kvůli tomu větru. Větve mě mrskali. Ach, moje ubohá záda.
+Odpověď na možnost E2: Já se už nebojím. A snad se nebudeš bát ani ty.
+
+HRÁČ
+Pokračování na odpověď k možnosti E1 (C3): Pomůžu vám dostat se domů.
+Pokračování na odpověď k možnosti E2 (F1): Nebudu. Co ode mě potřebujete?
+Dialogová možnost Z2: Už musím bohužel jít.
+
+MLADÁ ŽENA
+Odpověď na možnost F1: Kdybys byla tak hodná a došla do mé chaloupky a přinesla dýku, kterou mám schovanou v zásuvce. Zamotala jsem se do dlouhých větví té prokleté vrby a nemám čím bych větve přeřízla, abych se z nich dostala.
+
+HRÁČ
+Pokračování na odpověď k možnosti F1 (G1): Ráda to udělám. Hned budu zpátky.
+Dialogová možnost Z2: Už musím bohužel jít.
+
+MLADÁ ŽENA (smutně)
+Odpověď na možnosti Z1 i Z2: Ššš, děťátko. Jednou se objeví někdo, kdo nám pomůže.
+KONEC DIALOGU
+Při ukončení dialogu pomocí možností Z1 nebo Z2, hráč nezískává novou misi.
+Při ukončení dialogu pomocí možnosti G1, hráč získává novou vedlejší misi/quest.
+SIDE QUEST
+Prerequisite: Dialog s ženou stojící u vrby
+Type: Příběh
+Title: Nářek pod vrbou
+Description: Mladá ženě se svým malým synem potřebuje od tebe, abys jí přinesla dýku z její chaloupky. Zapletla se do větví vrby a nemůže se dostat pryč.
+Po přinesení dýky z chatrče hráč zjistí, že mladá žena se už dávno větvích vrby uškrtila. Ale tím, že jí hráč pomohl a pomocí dýky přeříznul větve vrby, mohl její duch konečně najít klidu.
+
+YOKAI
+Yanagi onna (柳女, やなぎおんな)
+Source, reference: https://yokai.com/yanagionna/
+
+Translation: willow woman
+Habitat: willow trees
+Diet: none
+
+Appearance: Yanagi onna are spirits which appear near willow trees late at night. They take the form of young women, occasionally carrying children in their arms.
+
+Behavior: Yanagi onna appear to passersby on dark nights and beg for help. They resemble ghosts like ubume and kosodate yurei–motherly spirits who seek the wellbeing of their children even in death.
+
+Legends: Long ago, a young woman was walking at night, carrying her baby. Suddenly the wind blew strong. The woman sought shelter under a nearby willow tree. However, the fierce wind caused the long, drooping branches of the willow to whip violently. The woman became entangled in the branches. Some of them wrapped around her throat. She struggled to escape, but the branches constricted her neck tighter and tighter. Finally, she was strangled to death. Since then, a ghostly woman carrying a baby appeared under the willow tree every night, cursing the willow as she cried.
+
+

@@ -1,0 +1,257 @@
+
+
+CRY UNDER THE WILLOW TREE
+
+written by Dominik Michna
+
+December 9, 2023
+
+Recommended music for reading:
+[Joe Hisaishi, Spotify link]
+–––––––––––––––––––––––– SCRIPT FOR QUEST EXAMPLE –––––––––––––––––––––––––
+The following dialog and quest are only available at night. During the day, the NPC won't appear by the lake in that location.
+The player walks by the lake surrounded by willows (Marker type: 2).
+Underneath one willow sits a YOUNG WOMAN dressed in a long, purple kimono with floral patterns. In her arms, she holds a baby wrapped in a shawl.
+Dialogue triggers automatically as the player passes by the NPC. The maximum distance for dialogue initiation is approximately 15 meters from the NPC.
+YOUNG WOMAN (crying)
+Shh, don't cry, little one. The wind might stop soon. And hopefully, that cursed willow will finally let us go.
+DIALOG 1 START (interaction with woman)
+PLAYER
+Can I help you in any way?
+YOUNG WOMAN
+Oh yes please. The little one didn't want to sleep at night, so I took him outside for fresh air. But a very strong wind caught us, so I hid here under the willows.
+PLAYER
+Has the little one managed to fall asleep yet?
+YOUNG WOMAN
+He's trying to sleep, he's trying. But it can't. The willow will not let him.
+PLAYER
+How so?
+YOUNG WOMAN
+Those branches of hers. Oh, how it hurt when that strong wind blew. It hurt a lot.
+PLAYER
+What happened?
+YOUNG WOMAN
+Her branches are too long. They hurt me.
+PLAYER
+What do you mean?
+YOUNG WOMAN
+That's because of the wind. The branches lashed out at me. Oh, my poor back.
+PLAYER
+I'll help you get home.
+YOUNG WOMAN
+You'd be very kind, dear. But I'm not sure if you can manage it.
+PLAYER
+Why shouldn't I?
+YOUNG WOMAN
+A young fox like you shouldn't be roaming the night.
+PLAYER
+I can do it. You don't have to worry about me.
+YOUNG WOMAN
+Fear is all I have left. Oh my little one, shhh, hopefully it will be over soon, dear.
+PLAYER
+What do you need from me?
+YOUNG WOMAN
+If you would be so kind as to come to my cottage and bring me my husband's dagger, hidden in the kitchen drawer. I got tangled in the long branches of that cursed willow, and I have nothing to cut them with to free myself.
+PLAYER
+I'll be happy to do it. I'll be right back.
+
+QUEST
+Prerequisite: Dialogue with the crying woman by the willow
+Type: Story
+Title: Cry under the willow tree
+Description: A young woman and her young son need you to bring her a dagger from her cottage. She got tangled in the willow branches and can't get away.
+OBJECTIVE 1 START
+Title: Find the young woman's cottage
+Complete condition: Interact with the marker location
+Start blockers: Dialog 1 must be completed
+Marker type: 2
+ASSET 1 - Woman's cottage (exterior)
+appear: absolute start
+disappear: absolute end
+interaction text: Open
+The player arrives at the location marked on the map. It's a traditional Japanese-style cottage, primarily made from natural materials, with a thatched roof and sliding panels assembled without the use of nails or screws.
+When trying to open the door:
+PLAYER
+It won't budge. Looks like the door's blocked by something.
+OBJECTIVE 2
+Title: Get to the cottage in a different way
+Complete condition: Transforming into fox form and jumping through an open window
+Start blockers: Objective 1
+Marker type: None
+ASSET 2 - Open window
+appear: quest start
+disappear: quest end
+interaction text: none
+The only way for the player to enter the cottage is by transforming into a fox form and leaping through the open window. Any available kitsune form can be used.
+OBJECTIVE 3
+Title: Find the dagger
+Complete condition: Finding the dagger requested by the woman
+Start blockers: Objective 2
+Marker type: None
+ASSET 3 - Woman's Cottage (interior)
+appear: quest start
+disappear: quest end
+interaction text: none
+The cottage is divided into the main living space, serving as both bedroom and dining area, approximately the size of four tatami mats. There's also a small entry room and a tiny kitchen. Traditional tatami mats cover the floor. Otherwise, the entire cottage is modestly furnished.
+After leaping through the window into the cottage, the player will appear directly in the main living space. They can further explore the cottage in fox form, but they might struggle to reach some places and should transform back into human form.
+ASSET 4 – Low dining table
+appear: quest start
+disappear: quest end
+interaction text: Explore
+Low dining table with four low chairs. On the table, two plates with spoons. Each plate contains unidentifiable food remains in an advanced stage of decay and mold.
+DIALOG 2 (optional, interaction with the dining table)
+PLAYER
+Yuck, that stinks. Hopefully, she didn't feed this to the baby. But I don't see a knife or a dagger here.
+
+ASSET 5 – Futon bed
+appear: quest start
+disappear: quest end
+interaction text: Explore
+Unmade dirty futon bed covered in dust. Urine stains are evident in the bed.
+DIALOG 3 (optional, interaction with the bed)
+PLAYER
+The little one seems to wet the bed often at night. But it looks like they haven't slept together here for a long time.
+DIALOG 4 (scene starts automatically after DIALOGUE 3 ends)
+A strong wind slams the shutters of the open window, blowing into the cottage and lifting the scattered papers around the futon bed into the air. The papers then slowly glide back down to the ground.
+PLAYER (startled by shutters and strong wind)
+Ah!
+PLAYER (cont'd)
+Stupid wind.
+ASSET 6 – Sheets of written paper
+appear: quest start
+disappear: quest end
+interaction text: Explore
+READABLE (optional, interaction with the written paper)
+Only some lines and words are barely legible.
+He's not sleeping again .. he's still crying and just crying ..
+I don't know what to do .. I'm up to it .. .. alone ..
+.. sometimes helps when .. … cold, fresh air .. ..
+Maybe .. they could sometime .. walk
+
+DIALOG 5 (starts automatically after exploring ASSET 6)
+PLAYER (sadly)
+Poor woman. She's having a really tough time in life. I wonder where her husband went.
+ASSET 7 – Small kitchen
+appear: quest start
+disappear: quest end
+interaction text: Explore
+A small, old-fashioned kitchen directly connects to the main living area. The paper panel that separates it is pushed aside. The player can enter directly.
+While exploring the kitchen, he discovers the woman's dagger.
+ASSET 8 – Dagger
+appear: after interacting with ASSET 7
+disappear: quest end
+interaction text: Take
+OBJECTIVE 4
+Title: Return to the woman crying by the willow tree
+Complete condition: Interact with the woman
+Start blockers: Objective 3
+Marker type: 2
+The player can exit the cottage either in kitsune form again, finding a way to leap back out through the window, or remove the sandals blocking the sliding doors.
+ASSET 9 – Sandals blocking the entry door
+appear: quest start
+disappear: quest end
+interaction text 1: Explore (possible after completing Objective 3)
+DIALOG 5 (starts when interacting with ASSET 9 using interaction text 1)
+PLAYER (kneels down to examine the sandals)
+Could the strong wind have blown these and caused the doors not to open?
+ASSET 9 – Sandals blocking the entry door
+appear: quest start
+disappear: quest end
+interaction text 2: Remove (possible after interaction text 1)
+ASSET 10 – Sliding entrance door
+appear: quest start
+disappear: quest end
+interaction text: Open (possible after completing Objective 3)
+Upon leaving the cottage, the player has the choice to continue exploring the world or proceed to complete Objective 4 and the entire side quest.
+DIALOG 6  (triggers when interacting with a woman as part of completing Objective 4)
+YOUNG WOMAN
+Oh, you're back. Do you have my dagger? Shh, don't cry, little one. We'll go home soon.
+PLAYER
+Yes. I managed to find her.
+YOUNG WOMAN
+You're our savior, little fox. Please, cut the branches of that cursed willow.
+OBJECTIVE 5
+Title: Cut the willow branches
+Complete condition: Cutting branches
+Start blockers: Objective 4
+Marker type: None
+ASSET 11 – Branches of the Cursed Willow 
+appear: objective start
+disappear: objective end
+interaction text: Cut through
+DIALOG 7  (triggers when interacting with ASSET 11)
+YOUNG WOMAN
+Thank you my dear.  Finally, we can go home. And the little one will be able to sleep peacefully. 
+After dialogue 7 ends, the young woman and her son turn into white smoke and slowly dissipate in the wind.
+OBJECTIVE 6
+Title: Search the willow area
+Complete condition: Interaction with Asset 12
+Start blockers: Objective 5
+Marker type: None
+ASSET 12 – Dead body of the woman
+appear: objective start
+disappear: objective end
+interaction text: Explore
+Upon investigation, the player discovers that the woman strangled herself on willow branches a long time ago. The condition of the dead body suggests that this did not happen recently, but it will be a considerably longer time. The skin on the body is dry and wrinkled. Willow branches are tangled around her neck. In her hands holding an empty scarf.
+By completing the quest, the player will unlock a medallion called Yanagi onna.
+
+––––––––––––––––––––– QUEST SUCCESSFULLY COMPLETED ––––––––––––––––––––––
+
+Yokai: Yanagi onna
+Source, reference: https://yokai.com/yanagionna/
+
+––––––––––––––––––––––––––––––––––––––––––––––––––– ASSET DESIGN –––––––––––––––––––––––––––––––––––––––––––––––––––
+
+Asset no.
+Asset name
+Reference pictures
+Objective
+ASSET 1
+Woman's Cottage (exterior)
+
+Objective 1
+ASSET 2
+Open window
+
+Objective 2
+ASSET 3
+Woman's Cottage (interior)
+
+Objective 3
+ASSET 4
+Low dining table with chairs and dishes
+
+Objective 3
+ASSET 5
+Futon bed
+
+Objective 3
+ASSET 6
+Sheets of written paper
+
+Objective 3
+ASSET 7
+Small kitchen
+
+Objective 3
+ASSET 8
+Dagger
+
+Objective 3
+ASSET 9
+Sandals
+
+Objective 4
+ASSET 10
+Sliding doors
+
+Objective 4
+ASSET 11
+Branches of the Cursed Willow
+
+Objective 5
+ASSET 12
+Dead body of a woman
+
+Objective 6
+

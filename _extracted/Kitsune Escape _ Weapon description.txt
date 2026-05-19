@@ -1,0 +1,23 @@
+
+Weapons and equipments
+Kyūbi's dream
+Description
+From the twilight's wood tanned by foxfire's dance. Holds the whispered words.
+Type
+Kitsune mask
+Feature
+Shape-shift to Kyūbi (the first one-tail form) 
+
+[Credits: Isrrael Bonifaz]
+
+Hikari no Ōzakura (光の大桜)
+Description
+Blossoms with cherry flowers of stories you won't hear anymore.
+Type
+Katana
+Feature
+Damage: 214 dps
+Attribute: +45 spirit
+
+[Credits: Artemova]
+

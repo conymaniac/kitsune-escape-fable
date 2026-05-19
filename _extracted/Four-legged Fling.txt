@@ -1,0 +1,111 @@
+
+–––––––––––––––––––––––––––––––– SCRIPT ––––––––––––––––––––––––––––––––––––
+
+EXT. JÖTUNHEIMR - SNOW-COVERED PLAIN - SUNRISE
+
+MOVING OVER an endless, snow-covered plain where a great battle is taking place.
+
+CLOSE UP OF THOR, a massive, almost obese figure, swings a giant hammer amidst the chaos of battle.
+
+GIANTS of all sizes attack him from all sides with clubs or bare fists.
+
+CUT TO:
+Mission
+Prerequisite: Ending of the cutscene showing Thor fighting with giants.
+Type: Story
+Title: Four-legged Fling
+Description: Thor went east to fight the giants. Asgard is quieter without him, but not as safe. You feel responsible for protecting the gods. A wall must be built. Help is offered by an unexpected newcomer.
+
+EXT. ASGARD - GARDENS - LATE AFTERNOON
+
+ODIN, a tall figure with a white full beard and a patch over his right eye, walks through the garden.
+
+HEIMDALL, a sturdy figure with a large sword on his back, stands by the fountain in the middle of the garden.
+
+Next to Heimdall stands LOKI, a smaller figure wearing a helmet with two long horns on his head.
+
+The screen is visible. Player is walking northeast from the fountain, approx. 500 meters away.
+Objective 1
+Title: Find Heimdall and Loki by the fountain
+Complete condition: Interact with Heimdall or Loki
+Start blockers: None
+Marker type: 2
+Objective 2
+Title: Talk to Heimdall
+Complete condition: Dialogue 1 has to finished
+Start blockers: Objective 1
+Marker type: None
+DIALOGUE 1 START (when Odin interacts with Heimdall or Loki)
+ODIN (seriously)
+We can't always rely on Thor. We need protection. Giants are coming. Trolls are coming.
+
+HEIMDALL
+And what do you suggest?
+
+ODIN
+A wall. One so high that the chilling giants cannot cross it. So strong that not even the mightiest troll could break through.
+
+LOKI (thoughtfully)
+Building such a wall, so high and strong, will take us many years.
+
+Odin nods in agreement.
+
+ODIN
+Nevertheless, we still need it.
+
+Objective 3 (optional)
+Title: Find chess figure
+Complete condition: Take chess figure from decorated chest
+Start blockers: None
+Marker type: 2
+ODIN
+I wonder what's inside.
+ASSET 1 – Iron decorated chest
+appear: mission start
+disappear: mission end
+interaction text: Open
+ASSET 2 – The chess figure in the shape of raven
+appear: after interacting with the Asset 1
+disappear: after interacting
+interaction text: Take
+In the garden, player can arrive at the spot marked by the map marker and he finds an iron decorated chest there. There are several ornaments on the chest, no text.
+Inside the chest, player can find a chess figure in the shape of a raven.
+After taking the chess figure, a new entry in the lore encyclopedia (called Runestones) appears.
+READABLE (optional, reading the new entry in the Runestones)
+Huginn
+The Feathered Omen of Huggin, woven with the threads of ancient winds, bears the imprints of wisdom etched by Odin upon the parchment of time. Carrying the echoes of distant realms, this sacred relic of Huggin grants the beholder fleeting glimpses into the enigmatic tapestry of the Nine Realms.
+Objective 4
+Title: Return to Odin's hall
+Complete condition: Interact with a place marked by marker
+Start blockers: Objective 2
+Marker type: 2
+ASSET 3 – The door to Odin's hall
+appear: absolute start
+disappear: absolute end
+interaction text: Open
+Player finds the spot on the map and interacts with the doors. Then this objective is completed.
+–––––––––––––––––––––––––– MISSION CONTINUES ––––––––––––––––––––––––––––––
+
+––––––––––––––––––––––––––––– ASSET DESIGN –––––––––––––––––––––––––––––––––
+
+Asset
+Prio
+Reference pictures
+Status / Final assets
+Placeholders
+Variants
+Objective
+Note
+ASSET 1 – Iron decorated chest
+
+Objective 3
+
+ASSET 2 – The chess figure in the shape of raven
+
+Objective 3
+
+ASSET 3 – The door to Odin's hall
+
+Objective 4
+
+
