@@ -63,20 +63,23 @@ const GROUND_Y = 660;
 const FLOOR_TOP = GROUND_Y - 2; // physics platform's top edge
 
 // Exterior layout
-const EXT_PLAYER_SPAWN = { x: 200, y: 550 };
-const EXT_COTTAGE = { x: 640, y: 400 };
-// Door/window interaction coords are placed in world space below; they are
-// derived from the cottage-ext anchor (the texture is 420x300 with content
-// roughly inside [40..380] × [30..270]).
+const EXT_PLAYER_SPAWN = { x: 200, y: 480 };
+// Cottage texture is 600×440 — centred so the bottom (y = 660) sits on the
+// floor, so EXT_COTTAGE.y = 660 - 220 = 440.
+const EXT_COTTAGE = { x: 640, y: 440 };
+// Door / window positions are derived as fractions of the cottage texture
+// (door roughly at the horizontal centre, lower third; window roughly at
+// 15% from the left, upper third) so they stay correct if the cottage gets
+// resized again.
 //
-// IMPORTANT: this is a side-scroller. The player is grounded around y=636
-// and can't physically reach a zone at y=360. So we keep the *visual*
+// IMPORTANT: this is a side-scroller. The player is grounded around y=603
+// and can't physically reach a zone at y=380. So we keep the *visual*
 // position of the window high (where the glow renders) but place its
 // *interaction* zone at ground level under the window — pressing E there
 // triggers the "leap up through the window" beat.
-const EXT_DOOR = { x: EXT_COTTAGE.x, y: EXT_COTTAGE.y + 70 };
-const EXT_WINDOW_VISUAL = { x: EXT_COTTAGE.x - 145, y: EXT_COTTAGE.y - 40 };
-const EXT_WINDOW_ZONE = { x: EXT_COTTAGE.x - 145, y: 600 };
+const EXT_DOOR = { x: EXT_COTTAGE.x, y: EXT_COTTAGE.y + 100 };
+const EXT_WINDOW_VISUAL = { x: EXT_COTTAGE.x - 207, y: EXT_COTTAGE.y - 60 };
+const EXT_WINDOW_ZONE = { x: EXT_COTTAGE.x - 207, y: 600 };
 
 // Interior layout
 const INT_PLAYER_SPAWN = { x: 240, y: 300 };
@@ -95,6 +98,17 @@ const INT_WINDOW_EXIT = { x: 240, y: 600 };
 const INTERACT_RANGE_DEFAULT = 80;
 const FADE_MS = 300;
 const ENTRY_LOCK_MS = 500;
+
+// Camera tunables. The interior is a relatively small intimate space — zoom
+// in so Mizumi and the props read at sensible scale (otherwise the 1280-wide
+// room dwarfs the 80×120 character). Exterior keeps zoom 1.0 so the cottage
+// reads against the night-sky vista at its natural scale.
+const INTERIOR_CAMERA_ZOOM = 1.7;
+const EXTERIOR_CAMERA_ZOOM = 1.0;
+/** Camera Y offset relative to the player when following inside (negative =
+ * camera looks higher than the player so we still see the broken window and
+ * the ceiling beams while the player stands on the floor). */
+const INTERIOR_FOLLOW_OFFSET_Y = -90;
 
 // ---------------------------------------------------------------------------
 
@@ -335,6 +349,12 @@ export class CottageScene extends Phaser.Scene {
   // -------------------------------------------------------------------------
 
   private buildExterior(): void {
+    // Camera: natural scale (the cottage + lake compose nicely at 1:1).
+    this.cameras.main.setZoom(EXTERIOR_CAMERA_ZOOM);
+    this.cameras.main.stopFollow();
+    this.cameras.main.scrollX = 0;
+    this.cameras.main.scrollY = 0;
+
     // Night sky background — reuse the lake-bg image, dimmed and scaled to
     // cover. The exterior of the cottage sits on top of it.
     const bg = this.add.image(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, "lake-bg");
@@ -454,6 +474,12 @@ export class CottageScene extends Phaser.Scene {
   // -------------------------------------------------------------------------
 
   private buildInterior(): void {
+    // Camera: zoom in. A side-scroller's natural "indoor" framing is closer
+    // to the action — at 1:1 the 80×120 character gets swallowed by the
+    // 1280×720 room. Player follow keeps Mizumi centered; a slight upward
+    // follow offset keeps the broken window in view above her head.
+    this.cameras.main.setZoom(INTERIOR_CAMERA_ZOOM);
+
     // Interior background covers the whole world.
     const bg = this.add.image(
       WORLD_WIDTH / 2,
@@ -529,6 +555,12 @@ export class CottageScene extends Phaser.Scene {
     this.player = new Player(this, INT_PLAYER_SPAWN.x, INT_PLAYER_SPAWN.y);
     this.player.sprite.setDepth(20);
     this.physics.add.collider(this.player.sprite, this.platforms);
+
+    // Camera follow with X smoothing + a fixed-ish Y (lerp Y small) plus an
+    // upward offset so we keep both Mizumi and the broken window in frame.
+    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    this.cameras.main.startFollow(this.player.sprite, true, 0.15, 0.05);
+    this.cameras.main.setFollowOffset(0, INTERIOR_FOLLOW_OFFSET_Y);
 
     // Lock input for half a second so the player visibly falls/lands before
     // they can move. Gravity (1400) handles the drop.

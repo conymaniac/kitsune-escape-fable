@@ -16,7 +16,12 @@
  */
 
 import Phaser from "phaser";
-import { SPRITE_DIMENSIONS, FILENAME_TO_KEY } from "./dimensions";
+import {
+  SPRITE_DIMENSIONS,
+  FILENAME_TO_KEY,
+  KEYS_WITH_OPAQUE_BG,
+  WHITE_KEY_THRESHOLD,
+} from "./dimensions";
 import {
   preloadAllSprites as geminiPreload,
   generateAllSprites as geminiGen,
@@ -62,6 +67,23 @@ export function preloadAllSprites(scene: Phaser.Scene): void {
   geminiPreload(scene);
 }
 
+/** Same chroma-key as in sprites.gemini.ts. See there for rationale. */
+function applyWhiteKey(canvas: Phaser.Textures.CanvasTexture): void {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.context;
+  const img = ctx.getImageData(0, 0, w, h);
+  const data = img.data;
+  const t = WHITE_KEY_THRESHOLD;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i] > t && data[i + 1] > t && data[i + 2] > t) {
+      data[i + 3] = 0;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  canvas.refresh();
+}
+
 /**
  * 1) Convert ChatGPT PNGs first (they win on collision).
  * 2) Delegate to geminiGen() for the rest. That function:
@@ -90,7 +112,12 @@ export function generateAllSprites(scene: Phaser.Scene): void {
     canvas.context.imageSmoothingEnabled = true;
     canvas.context.imageSmoothingQuality = "high";
     canvas.context.drawImage(src, 0, 0, w, h);
-    canvas.refresh();
+
+    if (!KEYS_WITH_OPAQUE_BG.has(entry.key)) {
+      applyWhiteKey(canvas);
+    } else {
+      canvas.refresh();
+    }
 
     scene.textures.remove(entry.srcKey);
   }

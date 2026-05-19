@@ -28,15 +28,20 @@ const PARTICLE_COUNT = 14;
 const PARTICLE_LIFETIME_MS = 450;
 const PARTICLE_SPEED = 110;
 
-// --- Body shapes per form: { width, height, offsetX, offsetY } ---
-interface BodyShape {
-  width: number;
-  height: number;
-  offsetX: number;
-  offsetY: number;
+// --- Body shapes per form, expressed as a PERCENTAGE of the texture size.
+// This way the physics body scales correctly when SPRITE_DIMENSIONS changes
+// (e.g. mizumi-human from 64×96 to 80×120) or when a different art style
+// supplies a different canvas size. Computed fresh in applyBody().
+interface BodyPct {
+  w: number;
+  h: number;
+  ox: number;
+  oy: number;
 }
-const HUMAN_BODY: BodyShape = { width: 32, height: 88, offsetX: 16, offsetY: 4 };
-const FOX_BODY: BodyShape = { width: 50, height: 28, offsetX: 7, offsetY: 10 };
+// Human: ~50% wide, ~92% tall, centered horizontally, small top margin.
+const HUMAN_BODY_PCT: BodyPct = { w: 0.5, h: 0.92, ox: 0.25, oy: 0.04 };
+// Fox: ~78% wide, ~70% tall, biased slightly forward to leave room for tail.
+const FOX_BODY_PCT: BodyPct = { w: 0.78, h: 0.7, ox: 0.11, oy: 0.25 };
 
 export class Player {
   scene: Phaser.Scene;
@@ -165,11 +170,16 @@ export class Player {
 
   // --- Internal helpers ---
 
-  /** Resize and re-offset the physics body to match the given form. */
+  /** Resize and re-offset the physics body to match the given form. Body
+   *  dimensions are scaled to the current texture's actual size so the
+   *  collision shape stays correct across art styles and dimension bumps. */
   private applyBody(form: KitsuneForm): void {
-    const shape = form === "fox" ? FOX_BODY : HUMAN_BODY;
-    this.sprite.body?.setSize(shape.width, shape.height);
-    this.sprite.body?.setOffset(shape.offsetX, shape.offsetY);
+    const pct = form === "fox" ? FOX_BODY_PCT : HUMAN_BODY_PCT;
+    // Phaser's Sprite reports the texture frame's natural width/height.
+    const texW = this.sprite.width;
+    const texH = this.sprite.height;
+    this.sprite.body?.setSize(texW * pct.w, texH * pct.h);
+    this.sprite.body?.setOffset(texW * pct.ox, texH * pct.oy);
   }
 
   /** Write form into the shared registry GameState so other scenes see it. */

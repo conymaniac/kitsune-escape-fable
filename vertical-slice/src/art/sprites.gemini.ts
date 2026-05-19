@@ -16,7 +16,12 @@
  */
 
 import Phaser from "phaser";
-import { SPRITE_DIMENSIONS, FILENAME_TO_KEY } from "./dimensions";
+import {
+  SPRITE_DIMENSIONS,
+  FILENAME_TO_KEY,
+  KEYS_WITH_OPAQUE_BG,
+  WHITE_KEY_THRESHOLD,
+} from "./dimensions";
 import { generateAllSprites as handdrawnGen } from "./sprites.handdrawn";
 
 // Vite eager glob — resolves every PNG URL at build time into a string.
@@ -69,6 +74,34 @@ export function preloadAllSprites(scene: Phaser.Scene): void {
 }
 
 /**
+ * Chroma-key pass: turn near-white pixels into transparent ones.
+ *
+ * The image generators (Gemini, ChatGPT) produce subjects on solid white
+ * backgrounds. To make them composite cleanly over scene backdrops we walk
+ * the pixel buffer once and zero the alpha of anything that's "near white"
+ * (all three channels above WHITE_KEY_THRESHOLD). The threshold is tuned so
+ * that cream skin (#F3E9D2, B=210) is preserved.
+ *
+ * Skipped for keys in KEYS_WITH_OPAQUE_BG — those are intentional full-frame
+ * backgrounds (lake, interior wall) that need to stay solid.
+ */
+function applyWhiteKey(canvas: Phaser.Textures.CanvasTexture): void {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.context;
+  const img = ctx.getImageData(0, 0, w, h);
+  const data = img.data;
+  const t = WHITE_KEY_THRESHOLD;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i] > t && data[i + 1] > t && data[i + 2] > t) {
+      data[i + 3] = 0;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  canvas.refresh();
+}
+
+/**
  * Resize loaded PNGs into canonical sprite dimensions and register them under
  * the final keys. Then call handdrawnGen() so any missing key gets a fallback.
  *
@@ -97,7 +130,14 @@ export function generateAllSprites(scene: Phaser.Scene): void {
     canvas.context.imageSmoothingEnabled = true;
     canvas.context.imageSmoothingQuality = "high";
     canvas.context.drawImage(src, 0, 0, w, h);
-    canvas.refresh();
+
+    // For everything that's NOT an intentional backdrop, key out the white
+    // background so the subject sits on its silhouette only.
+    if (!KEYS_WITH_OPAQUE_BG.has(entry.key)) {
+      applyWhiteKey(canvas);
+    } else {
+      canvas.refresh();
+    }
 
     // Drop the temporary high-res source so we don't keep huge bitmaps in RAM.
     scene.textures.remove(entry.srcKey);

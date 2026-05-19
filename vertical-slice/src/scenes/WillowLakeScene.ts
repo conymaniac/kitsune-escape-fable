@@ -669,48 +669,53 @@ export class WillowLakeScene extends Phaser.Scene {
   /**
    * Step 6 — drop a withered body sprite on the ground where Yanagi sat, and
    * add an interact indicator so the player can press E to learn the truth.
+   *
+   * Prefers the `yanagi-dead` texture (PNG, when the active art style ships
+   * one). Falls back to inline Graphics drawing if the texture is missing —
+   * keeps the slice working on procedural / partial asset sets.
    */
   private spawnBody(): void {
     if (this.bodyGraphics) return;
 
-    // Build a small Container of Graphics for the body.
     const container = this.add.container(WILLOW_X, GROUND_Y - 10);
     container.setDepth(1);
 
-    const g = this.add.graphics();
-    // Faded purple kimono / shroud — woman lying on her side.
-    g.fillStyle(Palette.purpleDeep, 0.9);
-    g.fillEllipse(0, 0, 80, 28);
-    // Dark hair pooled on the ground.
-    g.fillStyle(Palette.dark, 1);
-    g.fillEllipse(-30, 4, 36, 14);
-    // Withered face (cream/bone) — small circle peeking out of the hair.
-    g.fillStyle(Palette.creamSoft, 0.85);
-    g.fillCircle(-22, -2, 7);
-    // Hollow eye socket.
-    g.fillStyle(Palette.darkSoft, 1);
-    g.fillCircle(-24, -3, 1.5);
-    // Willow branches looped around the neck.
-    g.lineStyle(2, Palette.willow, 1);
-    g.beginPath();
-    g.moveTo(-16, -2);
-    g.lineTo(-6, 6);
-    g.lineTo(2, -2);
-    g.lineTo(10, 6);
-    g.strokePath();
-    g.lineStyle(2, Palette.leaf, 0.9);
-    g.beginPath();
-    g.moveTo(-14, 1);
-    g.lineTo(-4, 8);
-    g.strokePath();
-    // An empty shawl draped over the hands.
-    g.fillStyle(Palette.cream, 0.7);
-    g.fillEllipse(28, 4, 18, 8);
-    // Bones / skeletal hint at the wrist.
-    g.fillStyle(Palette.creamSoft, 0.95);
-    g.fillRect(20, 0, 8, 2);
+    if (this.textures.exists("yanagi-dead")) {
+      // Sprite path — the texture is centred on (0,0) inside the container,
+      // so the body lies horizontally just above the ground.
+      const img = this.add.image(0, 0, "yanagi-dead");
+      img.setOrigin(0.5, 0.5);
+      container.add(img);
+    } else {
+      // Fallback: original procedural body drawn inline.
+      const g = this.add.graphics();
+      g.fillStyle(Palette.purpleDeep, 0.9);
+      g.fillEllipse(0, 0, 80, 28);
+      g.fillStyle(Palette.dark, 1);
+      g.fillEllipse(-30, 4, 36, 14);
+      g.fillStyle(Palette.creamSoft, 0.85);
+      g.fillCircle(-22, -2, 7);
+      g.fillStyle(Palette.darkSoft, 1);
+      g.fillCircle(-24, -3, 1.5);
+      g.lineStyle(2, Palette.willow, 1);
+      g.beginPath();
+      g.moveTo(-16, -2);
+      g.lineTo(-6, 6);
+      g.lineTo(2, -2);
+      g.lineTo(10, 6);
+      g.strokePath();
+      g.lineStyle(2, Palette.leaf, 0.9);
+      g.beginPath();
+      g.moveTo(-14, 1);
+      g.lineTo(-4, 8);
+      g.strokePath();
+      g.fillStyle(Palette.cream, 0.7);
+      g.fillEllipse(28, 4, 18, 8);
+      g.fillStyle(Palette.creamSoft, 0.95);
+      g.fillRect(20, 0, 8, 2);
+      container.add(g);
+    }
 
-    container.add(g);
     this.bodyGraphics = container;
 
     // Indicator hovering over the body.
