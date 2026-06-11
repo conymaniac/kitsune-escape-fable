@@ -1,0 +1,452 @@
+/*
+ * M0 UI styling — minimal-but-readable dark theme.
+ * Stream E (M4) restyles: brush calligraphy, washi grain, ink portraits.
+ * Serif system stack only — no webfonts (asset purity).
+ */
+
+:root {
+  --ke-paper: #e9e1cc;
+  --ke-paper-dim: rgba(233, 225, 204, 0.65);
+  --ke-ink: #16131a;
+  --ke-night: rgba(14, 18, 38, 0.88);
+  --ke-night-soft: rgba(14, 18, 38, 0.72);
+  --ke-fox: #d97c33;
+  --ke-vermillion: #c6402e;
+  --ke-teal: #52c8b8;
+  --ke-violet: #9c79d8;
+  --ke-serif: Georgia, 'Iowan Old Style', 'Times New Roman', 'Noto Serif', serif;
+}
+
+#ui,
+#ui * {
+  box-sizing: border-box;
+}
+
+#ui {
+  font-family: var(--ke-serif);
+  color: var(--ke-paper);
+}
+
+.ke-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ───────────────────────── HUD ───────────────────────── */
+
+.ke-hud {
+  display: none;
+}
+.ke-hud.is-visible {
+  display: block;
+}
+
+.ke-banner {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  max-width: 360px;
+  padding: 10px 14px;
+  background: var(--ke-night-soft);
+  border-left: 3px solid var(--ke-fox);
+  border-radius: 2px;
+}
+.ke-banner-title {
+  font-size: 17px;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+}
+.ke-banner-hint {
+  margin-top: 4px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--ke-paper-dim);
+}
+
+.ke-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  padding: 7px 16px;
+  background: var(--ke-night);
+  border: 1px solid rgba(233, 225, 204, 0.35);
+  border-radius: 3px;
+  font-size: 16px;
+  white-space: nowrap;
+}
+.ke-prompt .ke-key {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--ke-paper);
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: bold;
+}
+.ke-prompt.is-blocked {
+  opacity: 0.65;
+  text-decoration: line-through;
+}
+
+.ke-form {
+  position: absolute;
+  left: 20px;
+  bottom: 18px;
+  padding: 6px 12px;
+  background: var(--ke-night-soft);
+  border-radius: 3px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+.ke-form.is-fox {
+  color: var(--ke-fox);
+}
+
+.ke-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 56px;
+  transform: translateX(-50%);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--ke-paper-dim);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+.ke-corner {
+  position: absolute;
+  right: 20px;
+  top: 18px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--ke-paper-dim);
+}
+.ke-corner .ke-muted-tag {
+  display: none;
+  margin-top: 4px;
+  color: var(--ke-vermillion);
+  font-weight: bold;
+}
+.ke-corner.is-muted .ke-muted-tag {
+  display: block;
+}
+
+/* ─────────────────────── dialog panel ─────────────────────── */
+
+.ke-dialog {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: min(720px, calc(100vw - 48px));
+  pointer-events: auto;
+}
+.ke-dialog.is-open {
+  display: block;
+}
+
+.ke-dialog-panel {
+  background: var(--ke-night);
+  border: 1px solid rgba(233, 225, 204, 0.28);
+  border-radius: 4px;
+  padding: 14px 18px 12px;
+}
+.ke-dialog-speaker {
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 0.14em;
+  color: var(--ke-violet);
+  margin-bottom: 6px;
+  min-height: 16px;
+}
+.ke-dialog-speaker.is-mizumi {
+  color: var(--ke-fox);
+}
+.ke-dialog-text {
+  font-size: 17px;
+  line-height: 1.5;
+  min-height: 52px;
+  white-space: pre-wrap;
+}
+.ke-dialog-advance {
+  text-align: right;
+  font-size: 12px;
+  color: var(--ke-paper-dim);
+  margin-top: 6px;
+  visibility: hidden;
+}
+.ke-dialog-advance.is-visible {
+  visibility: visible;
+}
+
+.ke-choices {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+.ke-choices li {
+  margin-top: 6px;
+}
+.ke-choice {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--ke-serif);
+  font-size: 16px;
+  color: var(--ke-paper);
+  background: rgba(233, 225, 204, 0.06);
+  border: 1px solid rgba(233, 225, 204, 0.22);
+  border-radius: 3px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.ke-choice:hover,
+.ke-choice:focus {
+  background: rgba(217, 124, 51, 0.18);
+  border-color: var(--ke-fox);
+  outline: none;
+}
+.ke-choice .ke-choice-num {
+  display: inline-block;
+  width: 1.4em;
+  color: var(--ke-paper-dim);
+}
+
+/* ─────────────────────── screens ─────────────────────── */
+
+.ke-screen {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  padding: 32px;
+}
+.ke-screen.is-open {
+  display: flex;
+}
+
+.ke-screen-title {
+  background: rgba(14, 18, 38, 0.55);
+}
+.ke-screen-intro,
+.ke-screen-ending {
+  background: var(--ke-night);
+}
+.ke-screen-pause {
+  background: rgba(14, 18, 38, 0.82);
+}
+
+.ke-title-main {
+  font-size: clamp(40px, 8vw, 76px);
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.6);
+}
+.ke-title-sub {
+  font-size: clamp(18px, 3vw, 26px);
+  font-style: italic;
+  color: var(--ke-fox);
+  margin: 10px 0 28px;
+}
+.ke-press-key {
+  font-size: 17px;
+  letter-spacing: 0.08em;
+  animation: ke-blink 1.6s ease-in-out infinite;
+}
+@keyframes ke-blink {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.ke-lang-row {
+  margin-top: 26px;
+  font-size: 14px;
+}
+.ke-lang-row .ke-lang-label {
+  color: var(--ke-paper-dim);
+  margin-right: 10px;
+}
+
+.ke-btn {
+  font-family: var(--ke-serif);
+  font-size: 15px;
+  color: var(--ke-paper);
+  background: transparent;
+  border: 1px solid rgba(233, 225, 204, 0.35);
+  border-radius: 3px;
+  padding: 6px 16px;
+  margin: 0 4px;
+  cursor: pointer;
+}
+.ke-btn:hover,
+.ke-btn:focus {
+  border-color: var(--ke-fox);
+  color: var(--ke-fox);
+  outline: none;
+}
+.ke-btn.is-active {
+  border-color: var(--ke-fox);
+  color: var(--ke-fox);
+}
+
+.ke-controls-list {
+  margin-top: 30px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--ke-paper-dim);
+  text-align: center;
+}
+.ke-controls-list .ke-controls-title {
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  color: var(--ke-paper);
+  margin-bottom: 4px;
+}
+
+.ke-intro-beat {
+  max-width: 620px;
+  font-size: clamp(18px, 2.6vw, 24px);
+  line-height: 1.7;
+  font-style: italic;
+}
+.ke-intro-skip {
+  position: absolute;
+  bottom: 26px;
+  right: 30px;
+  font-size: 13px;
+  color: var(--ke-paper-dim);
+}
+.ke-intro-advance {
+  position: absolute;
+  bottom: 26px;
+  left: 30px;
+  font-size: 13px;
+  color: var(--ke-paper-dim);
+}
+
+.ke-ending-scroll {
+  max-width: 640px;
+  max-height: 70vh;
+  overflow-y: auto;
+  text-align: center;
+}
+.ke-medallion-card {
+  border: 1px solid var(--ke-vermillion);
+  border-radius: 4px;
+  padding: 14px 22px;
+  margin-bottom: 26px;
+  background: rgba(198, 64, 46, 0.08);
+}
+.ke-medallion-award {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--ke-paper-dim);
+  margin-bottom: 6px;
+}
+.ke-medallion-name {
+  font-size: 22px;
+  color: var(--ke-vermillion);
+  font-weight: bold;
+}
+.ke-medallion-lore {
+  margin-top: 8px;
+  font-size: 14px;
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--ke-paper-dim);
+}
+.ke-ending-line {
+  font-size: 17px;
+  line-height: 1.8;
+  margin: 10px 0;
+  font-style: italic;
+}
+.ke-ending-hint {
+  margin-top: 26px;
+  font-size: 14px;
+  color: var(--ke-paper-dim);
+}
+
+.ke-pause-panel {
+  background: var(--ke-night);
+  border: 1px solid rgba(233, 225, 204, 0.28);
+  border-radius: 4px;
+  padding: 26px 38px;
+  min-width: 280px;
+}
+.ke-pause-title {
+  font-size: 26px;
+  margin: 0 0 18px;
+}
+.ke-pause-row {
+  margin: 10px 0;
+}
+
+/* ─────────────────────── fade layer ─────────────────────── */
+
+.ke-fade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.ke-fade.is-black {
+  opacity: 1;
+}
+
+/* ─────────────────────── paper overlay ─────────────────────── */
+
+.ke-paper {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 9, 12, 0.78);
+}
+.ke-paper.is-open {
+  display: flex;
+}
+.ke-paper-sheet {
+  background: var(--ke-paper);
+  color: var(--ke-ink);
+  max-width: 560px;
+  width: calc(100vw - 64px);
+  padding: 34px 40px;
+  border-radius: 2px;
+  box-shadow: 0 10px 50px rgba(0, 0, 0, 0.7);
+}
+.ke-paper-title {
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(22, 19, 26, 0.55);
+  margin-bottom: 16px;
+}
+.ke-paper-line {
+  font-size: 18px;
+  line-height: 1.9;
+  font-style: italic;
+}
+.ke-paper-close {
+  margin-top: 22px;
+  font-size: 13px;
+  color: rgba(22, 19, 26, 0.55);
+  text-align: right;
+}

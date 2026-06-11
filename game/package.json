@@ -1,0 +1,21 @@
+{
+  "name": "kitsune-escape",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Kitsune Escape — Cry under the Willow (vertical slice)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.182.0",
+    "tone": "^15.1.22"
+  },
+  "devDependencies": {
+    "@types/three": "^0.182.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.1.0"
+  }
+}
