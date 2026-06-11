@@ -1,6 +1,8 @@
 /**
  * UI root — owns the #ui DOM layer stack and injects styles.
  * Layer order (bottom→top): hud · dialog · screens · fade · paper.
+ * (screens.ts mounts its own float sublayer — whispers/self-talk bubbles —
+ * inside the screens layer, so it needs no slot here.)
  */
 import './styles.css';
 
