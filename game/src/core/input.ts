@@ -129,6 +129,16 @@ export class Input {
     this.pressed.clear();
   }
 
+  /**
+   * Drop any pending just-pressed state immediately (M1 additive — see
+   * BUILD_STATE "M1 E-ui integrator notes": a stale Escape could leak
+   * across the intro→play transition when rAF was throttled and instantly
+   * open pause; main.ts calls this on PhaseChanged).
+   */
+  clearPressed(): void {
+    this.pressed.clear();
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;

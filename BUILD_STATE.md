@@ -19,8 +19,10 @@ Branch: `claude/wonderful-mclean-bad83d`. New app: `game/`. CLEAN-ROOM: never to
 - [x] COMMIT M0
 
 ## M1 — Grey-box playable loop (parallel: D-core, B-world, C-chars, E-ui)
-- [ ] D-core: engine/renderer.ts, engine/camera.ts, gameplay/player.ts, interactions.ts,
-      triggers.ts, sceneDirector.ts, wind.ts (skeleton), questScript.ts, main.ts wiring
+- [x] D-core: engine/renderer.ts, engine/camera.ts, gameplay/player.ts, interactions.ts,
+      triggers.ts, sceneDirector.ts, wind.ts (FULL, not skeleton), main.ts wiring —
+      **questScript.ts still PENDING** (follow-up agent; DEV-PROVISIONAL interactions
+      in main.ts hold the world testable until then — see D-core notes below)
 - [x] B-world: world/exterior.ts + interior.ts greybox, colliders.ts, anchors, lash zones,
       wind shadows, props/ greybox stand-ins (FINAL layout/collider/anchor/zone data;
       greybox geometry — M2 swaps prop internals behind the same signatures)
@@ -248,6 +250,84 @@ Branch: `claude/wonderful-mclean-bad83d`. New app: `game/`. CLEAN-ROOM: never to
 - merge.ts works and exterior already uses it for static dressing (~600 dressing
   meshes → ~6 draw calls). Don't merge groups containing animated/named meshes
   without setting userData.noMerge on them.
+
+### M1 D-core — integrator notes (for the questScript agent)
+Files created (2026-06-12): engine/renderer.ts (SRGB+NoToneMapping, pixelRatio ≤1.75,
+PCFSoft shadow map, onResize plumbing) · engine/camera.ts (IsoCamera: ortho az 45°/el 30°,
+dir (0.6124,0.5,0.6124) dist 60, viewHeight 14/9 tweened, exp follow 1−exp(−dt·6) clamped
+0..1, look-ahead = velocity·0.15 s, soft bounds clamp [bounds minus vh/2·aspect × vh/2 —
+inverted range locks centre, which is how the interior pins the camera], shake(amp,dur),
+punch(0.02) punch-zoom, projectToScreen(world,out) for the bubble projector) ·
+gameplay/player.ts (PlayerController: accel 30→3.2/5.0 + exp friction; collide-slide
+circleVsStatics vs LIVE collider array; Bound 3 m/0.35 s/0.6 s cd w/ parabolic root arc +
+dust+Footstep, skips colliders in a setBoundPassable() set mid-hop; Brace = held Space
+human (stagger AND knockdown immune — DESIGN §3 finale "Brace beside her"); lash stagger
+×0.4 when human+outdoors+open; applyKnockdown(pushDir Vector2) → 0.45 s push ≈3 m → 3×E or
+2 s recover, 0.8 s grace; F→setForm + FormChanged emitted at request; footstep cadence by
+stride distance w/ surface from sceneDirector) · gameplay/interactions.ts (registry:
+register() returns unregister; nearest-in-range, facing dot>0.25 w/ <0.45 m near-override,
+priority ties→distance; humanOnly/foxOnly drive HUD crossed-paw blocked prompt; E fires
+onInteract + Interacted; canInteract injected) · gameplay/triggers.ts (TriggerDef =
+TriggerVolume + form?: KitsuneForm; once auto-unregisters; disabled-while-inside fires
+onExit) · gameplay/sceneDirector.ts (fade 0.3 → re-parent travellers [avatar.root,
+vfx.root] + swap colliders + teleport + viewHeight/bounds + wind.setEnabled → fade 0.3;
+emits EnterInterior/ExitInterior AFTER fade-in; locks player controls during swap) ·
+gameplay/wind.ts (calm 10–14 s [setCalmRange] → telegraph 3 s → lash 4 s; seeded
+mulberry32; strength envelope calm ~0.15/telegraph→0.55/lash 0.9; dir NW→SE (0.707,0.707)
+±10° wander per gust — uniforms.uWindDir.value ALIASES state.direction; GustStart
+('telegraph'|'lash')/GustEnd/WindStopped; lash-zone check calls player.applyKnockdown
+(away-from-centre) via setPlayer/setLashZones; setEnabled(false) cancels in-flight gust;
+stopForever() emits WindStopped immediately, eases strength→0) · main.ts (full composition
+root; update order input→wind→player→triggers→interactions→world/chars→vfx→camera→audio,
+render at order 100 runWhenPaused, input.lateUpdate at 1000).
+- Core touches (additive, documented): input.ts `clearPressed()` (drops pending
+  just-pressed; called on PhaseChanged, DialogEnded, PaperOverlayClosed and pause-resume —
+  fixes the stale-Esc/E leak from the E-ui note + an instant pause-reopen bug found in
+  browser); loop.ts dt clamp is now 0..MAX_DT (negative dt from a non-monotonic timestamp
+  source diverges exponential damping — found via test harness, one-word guard).
+- main.ts exterior light rig is a D-core placeholder until A-style lighting.ts: hemi fill
+  + moon key (1024² shadow, 40×40 ortho frustum that FOLLOWS the player) + warm rim;
+  shadows enabled by traversal (transparent materials never cast). Interior keeps
+  B-world's in-group lights.
+- boundPassable: the creek-narrows water collider [B1] is picked out of
+  exterior.colliders BY VALUE (aabb x −10..−6, z 4..6) in main.ts — if B-world retunes
+  the creek in M2, update that match (or tag the collider properly).
+- **DEV-PROVISIONAL registrations in main.ts (ids `dev-*`) — questScript MUST replace
+  all of them** (single block, clearly marked): `dev-gate` (gate E-opens, humanOnly —
+  replace w/ tutorial F-beat), `dev-door-exterior` (door bubble dlg.m.doorBlocked — no
+  flags set; replace w/ step-2 logic + door.blocked dialog), `dev-window-leap` (fox E →
+  enterInterior(windowLanding) — no leap parabola/cutscene yet), `dev-int-door` +
+  `dev-int-sandals` (both exit → exterior door anchor; no canon sandals gating),
+  `dev-int-window` (fox leap back out), `dev-ambient` trigger (15 m whisper, sets
+  ambientHeard, once) and `dev-ghost` (E → dialogSystem.start(DialogRoot.main) — build
+  order said placeholder bubble; upgraded to the real tree to integration-test the
+  runner: full A1→G1 walk verified, QuestStarted → banner works). Mask shrine, dagger
+  drawer, papers, table/futon, branch cutting, body mound: NOT registered — all
+  questScript's. Form switching is currently enabled unconditionally (mask not gated;
+  questScript gates F behind hasMask + scripts the shrine beat).
+- Handoff surface questScript needs from main.ts scope: dialogSystem, questSystem,
+  interactions, triggers, sceneDir, wind, vfx, exterior/interior builds, player,
+  flagStore, screens, hud, isoCam, audio — suggest constructing QuestScript in main.ts
+  with exactly these (everything is already instantiated there). A DEV-only
+  `window.__kitsune` debug handle {player, sceneDir, wind, director, isoCam, getFlags}
+  exists behind import.meta.env.DEV for scripted browser verification — keep it.
+- Pause volume slider still placeholder (M3); restart is full location.reload() (per
+  build order fallback; in-memory reset is M4 polish if wanted).
+- Verified in browser (vite dev, screenshots: title diorama / spawn glade / gate /
+  interior / promontory): build + tsc green, zero console errors; walk + tree/fence/
+  water collision; human funnel-blocked at hollow-log gap (stops ~0.18 u into the gap
+  mouth — reads fine in greybox), fox passes; Bound crosses creek narrows, water blocks
+  walking; gate fox=crossed-paw / human E-opens (collider spliced live); lash stagger
+  measured exactly 1.28 u/s; Brace speed 0 + applyKnockdown rejected while bracing;
+  lash-zone knockdown + push + "Mash E" hint + auto-recover (2 s) verified, 3×E mash
+  path code-reviewed (browser timer throttling made it unmeasurable); transform burst +
+  punch-zoom + time-dip + HUD form pop; window-leap → interior (camera tightens to vh 9,
+  locks centre) and door/sandals exit back; title→intro→play, pause open/resume (incl.
+  the stale-Esc fix), locale L toggle EN↔CS live, Esc correctly blocked while dialog
+  open; full Dialog 1 tree A1→…→G1 → QuestStarted → objective-1 banner. NOTE: the
+  preview tab was background-throttled (rAF 0–6 fps) — all timing-sensitive checks were
+  done via teleports/state reads; a human playtest at 60 fps is still wanted in M1
+  VERIFY.
 
 ### M0 notes / deviations
 - EN quest title authored as "Cry under the Willow" per build order; canon EN doc's

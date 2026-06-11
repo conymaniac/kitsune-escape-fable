@@ -40,7 +40,9 @@ export class GameLoop {
     this.last = performance.now();
     const tick = (now: number): void => {
       if (!this.running) return;
-      const dt = Math.min((now - this.last) / 1000, MAX_DT);
+      // Clamp 0..MAX_DT (M1 additive: a non-monotonic timestamp source
+      // must never produce a negative dt — exponential-damp math diverges).
+      const dt = Math.min(Math.max((now - this.last) / 1000, 0), MAX_DT);
       this.last = now;
       // Copy: update fns may add/remove entries mid-frame.
       for (const entry of [...this.entries]) {
