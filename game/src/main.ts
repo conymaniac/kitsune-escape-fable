@@ -5,9 +5,8 @@
  *   input → wind → player → triggers → interactions → characters/world
  *   anims → wisps/vfx → camera → audio tick → render.
  *
- * Quest scripting is NOT here: a follow-up agent ships
- * gameplay/questScript.ts. Everything marked DEV-PROVISIONAL below exists
- * only so the greybox world is testable and WILL be replaced by it.
+ * Quest scripting lives in gameplay/questScript.ts (constructed + wired
+ * below) — main stays a composition root.
  */
 import * as THREE from 'three';
 import { EventBus } from '@/core/events';
@@ -25,7 +24,6 @@ import { createScreens } from '@/ui/screens';
 import { onLocaleChange, setLocale, getLocale } from '@/i18n';
 import { DialogSystem } from '@/dialog/dialogSystem';
 import { QuestSystem } from '@/dialog/questSystem';
-import { DialogRoot } from '@/data/dialogs';
 import { buildExterior } from '@/world/exterior';
 import { buildInterior } from '@/world/interior';
 import { PlayerAvatar } from '@/characters/playerAvatar';
@@ -38,6 +36,7 @@ import { InteractionSystem } from '@/gameplay/interactions';
 import { TriggerSystem } from '@/gameplay/triggers';
 import { SceneDirector } from '@/gameplay/sceneDirector';
 import { WindSystem } from '@/gameplay/wind';
+import { QuestScript } from '@/gameplay/questScript';
 import type { ColliderShape, MotionState } from '@/core/types';
 
 // ─────────────────────────────────────────────────────────── kernel ──
@@ -268,119 +267,31 @@ screens.setProjector(() => {
   return isoCam.projectToScreen(headTmp, headPt);
 });
 
-// ────────────────────────────────────────── DEV-PROVISIONAL content ──
-// Everything in this block is throwaway scaffolding so the world is
-// testable WITHOUT gameplay/questScript.ts. The quest-script agent
-// REPLACES every registration below (ids prefixed `dev-`).
-{
-  // DEV-PROVISIONAL (questScript replaces): farm gate opens on E (human).
-  let devGateOpen = false;
-  interactions.register({
-    id: 'dev-gate',
-    position: exterior.anchors.gate,
-    radius: 1.8,
-    promptKey: 'prompt.open',
-    humanOnly: true,
-    enabled: () => sceneDir.active === 'exterior' && !devGateOpen,
-    onInteract: () => {
-      devGateOpen = true;
-      exterior.setGateOpen(true);
-      audio.playSfx('interact');
-    },
-  });
-
-  // DEV-PROVISIONAL (questScript replaces): cottage door is blocked.
-  interactions.register({
-    id: 'dev-door-exterior',
-    position: exterior.anchors.door,
-    radius: 1.5,
-    promptKey: 'prompt.open',
-    humanOnly: true,
-    enabled: () => sceneDir.active === 'exterior',
-    onInteract: () => screens.showBubble('dlg.m.doorBlocked'),
-  });
-
-  // DEV-PROVISIONAL (questScript replaces): fox window leap → interior.
-  interactions.register({
-    id: 'dev-window-leap',
-    position: exterior.anchors.window,
-    radius: 1.2,
-    promptKey: 'prompt.explore',
-    foxOnly: true,
-    enabled: () => sceneDir.active === 'exterior',
-    onInteract: () => {
-      audio.playSfx('windowLeap');
-      void sceneDir.enterInterior(interior.anchors.windowLanding);
-    },
-  });
-
-  // DEV-PROVISIONAL (questScript replaces): interior exits — sliding door
-  // and sandals both walk out to the exterior door anchor; the interior
-  // window leaps back beside the crates.
-  interactions.register({
-    id: 'dev-int-door',
-    position: interior.anchors.door,
-    radius: 1.3,
-    promptKey: 'prompt.open',
-    humanOnly: true,
-    enabled: () => sceneDir.active === 'interior',
-    onInteract: () => {
-      interior.setDoorOpen(true);
-      void sceneDir.exitToExterior(exterior.anchors.door);
-    },
-  });
-  interactions.register({
-    id: 'dev-int-sandals',
-    position: interior.anchors.sandals,
-    radius: 1.1,
-    promptKey: 'prompt.remove',
-    humanOnly: true,
-    enabled: () => sceneDir.active === 'interior',
-    onInteract: () => {
-      interior.setDoorOpen(true);
-      void sceneDir.exitToExterior(exterior.anchors.door);
-    },
-  });
-  interactions.register({
-    id: 'dev-int-window',
-    position: interior.anchors.windowLanding,
-    radius: 1.2,
-    promptKey: 'prompt.explore',
-    foxOnly: true,
-    enabled: () => sceneDir.active === 'interior',
-    onInteract: () => {
-      audio.playSfx('windowLeap');
-      void sceneDir.exitToExterior(exterior.anchors.window);
-    },
-  });
-
-  // DEV-PROVISIONAL (questScript replaces): the ghost. Ambient whisper at
-  // 15 m (canon beat), full Dialog 1 tree on E — exercises the dialog
-  // runner end-to-end (G1 grants the quest via the authored hooks).
-  const ghostHead = exterior.anchors.ghostSpot.clone().setY(1.5);
-  const ghostPt = { x: 0, y: 0 };
-  triggers.register({
-    id: 'dev-ambient',
-    position: exterior.anchors.ghostSpot,
-    radius: 15,
-    once: true,
-    onEnter: () => {
-      isoCam.projectToScreen(ghostHead, ghostPt);
-      screens.showWhisper('dlg.ambient.yanagi', ghostPt, {
-        violet: player.form === 'fox',
-      });
-      flagStore.flags.ambientHeard = true;
-    },
-  });
-  interactions.register({
-    id: 'dev-ghost',
-    position: exterior.anchors.ghostSpot,
-    radius: 2.6,
-    promptKey: 'prompt.talk',
-    enabled: () => sceneDir.active === 'exterior' && !flagStore.flags.questCompleted,
-    onInteract: () => dialogSystem.start(DialogRoot.main),
-  });
-}
+// ──────────────────────────────────────────────────── quest script ──
+// The entire scripted experience (tutorial → six objectives → reveal →
+// ending) — registers every interactable/trigger and owns all beats.
+const questScript = new QuestScript({
+  bus,
+  director,
+  input,
+  hud,
+  screens,
+  dialog: dialogSystem,
+  interactions,
+  triggers,
+  sceneDir,
+  wind,
+  vfx,
+  player,
+  avatar,
+  isoCam,
+  audio,
+  kit,
+  exterior,
+  interior,
+  yanagi,
+  getFlags: () => flagStore.flags,
+});
 
 // ──────────────────────────────────────────────────── loop wiring ──
 const dioramaTarget = new THREE.Vector3();
@@ -414,11 +325,20 @@ loop.add((rawDt) => {
     );
   }
 
-  // wind → player → triggers → interactions
+  // F is dormant until the mask-shrine beat grants it (DESIGN §8 —
+  // spawn as human WITHOUT the mask). Swallow the press before the
+  // player controller sees it; clearing all just-pressed state this
+  // frame is acceptable pre-mask (movement uses held keys, not presses).
+  if (!flagStore.flags.hasMask && input.justPressed('transform')) {
+    input.clearPressed();
+  }
+
+  // wind → player → triggers → interactions → quest script
   wind.update(dt);
   player.update(dt);
   triggers.update();
   interactions.update();
+  questScript.update(dt);
 
   // characters/world anims (active scene only)
   if (sceneDir.active === 'exterior') {
@@ -455,7 +375,7 @@ void input.anyGesture.then(() => audio.init());
 hud.setMuted(audio.isMuted());
 
 player.teleport(exterior.anchors.spawn);
-player.setFormInstant('human'); // mask not owned yet; F enabled for DEV
+player.setFormInstant('human'); // human, no mask — F unlocks at the shrine
 hud.setForm('human');
 
 function startGame(): void {
@@ -478,9 +398,9 @@ audio.setMusicState('title');
 screens.showTitle(startGame);
 loop.start();
 
-// Quest-script handoff (unused here, constructed for it): dialogSystem,
-// questSystem, triggers, interactions, sceneDir, wind, flagStore, vfx.
-void dialogSystem;
+// Restart (pause menu + ending R/Esc, wired inside questScript) is a full
+// page reload: flags, quest script, wind (stopForever is one-way), cut
+// branches and the world all come back factory-fresh — see BUILD_STATE.
 
 // DEV-only debug handle for scripted browser verification (stripped from
 // production builds by the `import.meta.env.DEV` guard).
@@ -491,6 +411,13 @@ if (import.meta.env.DEV) {
     wind,
     director,
     isoCam,
+    dialog: dialogSystem,
+    questScript,
+    screens,
+    interactions,
+    triggers,
+    input,
+    bus,
     getFlags: () => flagStore.flags,
   };
 }

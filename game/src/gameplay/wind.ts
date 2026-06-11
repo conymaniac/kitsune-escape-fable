@@ -124,6 +124,17 @@ export class WindSystem {
     }
   }
 
+  /**
+   * Tutorial hook (M1 questScript, additive): start one full
+   * telegraph→lash cycle right now. No-op unless calm, enabled and not
+   * stopped — the scripted first gust past the farm gate (DESIGN §8).
+   */
+  triggerGustNow(): void {
+    if (this.stoppedForever || !this.enabled) return;
+    if (this.state.phase !== 'calm') return;
+    this.advancePhase(); // calm → telegraph (emits GustStart('telegraph'))
+  }
+
   /** The finale: ease to dead still, never gust again. Silence. */
   stopForever(): void {
     if (this.stoppedForever) return;

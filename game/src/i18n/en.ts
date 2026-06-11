@@ -148,6 +148,11 @@ export const en = {
     "Poor woman. She's having a really tough time in life. I wonder where her husband went.",
   'dlg.m.sandals': 'Could the strong wind have blown these and caused the doors not to open?',
 
+  // ── quest-script beats (M1 D2: shrine whisper + branch-cut counter) ──
+  'whisper.mask': 'The mask is cold against her face — and the night opens its eyes.',
+  'cut.1': 'One branch cut. Two still hold her.',
+  'cut.2': 'Two branches cut. One still holds.',
+
   // ── readable diary (paper overlay) — canon fragments verbatim ──
   'paper.title': 'Scattered pages',
   'paper.line1': "He's not sleeping again .. he's still crying and just crying ..",

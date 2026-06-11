@@ -148,6 +148,11 @@ export const cs: Record<TranslationKey, string> = {
     'Chudák, žena. Má to v životě pěkně těžký. Zajímalo by mě, kam se poděl její muž.',
   'dlg.m.sandals': 'Že by je ten silný vítr odfoukl a kvůli tomu nešly otevřít ty dveře?',
 
+  // ── quest-script beats (M1 D2: shrine whisper + branch-cut counter) ──
+  'whisper.mask': 'Maska jí chladně přilne k tváři — a noc otevře oči.',
+  'cut.1': 'Jedna větev přeťatá. Dvě ji ještě drží.',
+  'cut.2': 'Druhá větev přeťatá. Už ji drží jen jedna.',
+
   // ── čitelný deník (papírový overlay) — kanonické útržky doslovně ──
   'paper.title': 'Rozházené papíry',
   'paper.line1': 'Už zase nespí .. stále pláče a jen pláče ..',

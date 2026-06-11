@@ -20,9 +20,11 @@ Branch: `claude/wonderful-mclean-bad83d`. New app: `game/`. CLEAN-ROOM: never to
 
 ## M1 — Grey-box playable loop (parallel: D-core, B-world, C-chars, E-ui)
 - [x] D-core: engine/renderer.ts, engine/camera.ts, gameplay/player.ts, interactions.ts,
-      triggers.ts, sceneDirector.ts, wind.ts (FULL, not skeleton), main.ts wiring —
-      **questScript.ts still PENDING** (follow-up agent; DEV-PROVISIONAL interactions
-      in main.ts hold the world testable until then — see D-core notes below)
+      triggers.ts, sceneDirector.ts, wind.ts (FULL, not skeleton), main.ts wiring
+- [x] D-core questScript.ts: the entire scripted experience (tutorial corridor incl.
+      mask-shrine beat + F-gate, all six objectives, both cottage exits, branch-cut
+      climax, dissolve → wind-stop → body reveal → medallion → ending) — main.ts
+      DEV-PROVISIONAL block fully replaced; see D2 notes below
 - [x] B-world: world/exterior.ts + interior.ts greybox, colliders.ts, anchors, lash zones,
       wind shadows, props/ greybox stand-ins (FINAL layout/collider/anchor/zone data;
       greybox geometry — M2 swaps prop internals behind the same signatures)
@@ -32,7 +34,10 @@ Branch: `claude/wonderful-mclean-bad83d`. New app: `game/`. CLEAN-ROOM: never to
 - [x] E-ui: dialog/dialogSystem.ts, questSystem.ts, ui/* functional (typewriter, choices,
       HUD, title/intro/ending/pause, locale toggle) + whisper/bubble channels + styled
       night-storybook theme (M1 scope of M4-P2 styling pulled forward; M4 refines)
-- [ ] VERIFY: full quest playable start→finish in greybox, EN+CS
+- [x] VERIFY: full quest playable start→finish in greybox, EN+CS (2026-06-12,
+      scripted browser walkthrough at ~30 fps via rAF pump — background tab;
+      every beat passed, zero console errors/warnings; details in D2 notes.
+      A human 60 fps feel-pass remains on the M4 PLAYTEST line)
 - [ ] COMMIT M1
 
 ## M2 — Art pass (parallel: A-style, B-world, C-chars)
@@ -151,6 +156,21 @@ Branch: `claude/wonderful-mclean-bad83d`. New app: `game/`. CLEAN-ROOM: never to
   being rewritten in parallel; preview files deleted after screenshots: full map,
   spawn corridor, promontory, cottage yard, interior all read correctly at
   viewHeight 14–22).
+
+- game/src/gameplay/questScript.ts — M1 D2 complete (2026-06-12). THE glue:
+  tutorial corridor (move glyph fade, mask-shrine 3 s beat w/ forced first
+  transform, creek Bound whisper, gate F-teach, scripted first gust via new
+  wind.triggerGustNow()), all six canon objectives (ambient 15 m + Dialog 1
+  w/ Z1/Z2 re-offer, door-blocked step, window-leap parabola, 4 interior
+  optionals + futon→shutter-slam chain + diary overlay, dagger pickup,
+  sandals OR window exits, Dialog 6 + storm escalation, 3 branch cuts gated
+  to calm/telegraph, Dialog 7 → stand+bow → dissolve → wind.stopForever()
+  → 2 s quiet → body marker → body reveal → medallion → ending), guide
+  kitsunebi retargeting, yanagi.fear brace whisper, suzu on quest ticks.
+  +3 i18n keys per locale (whisper.mask, cut.1, cut.2). Restart = reload.
+  Full scripted browser walkthrough EN + CS-spotcheck passed, zero console
+  errors (see D2 notes). main.ts: DEV block removed, QuestScript wired,
+  F-gated behind hasMask.
 
 ### M1 E-ui integrator notes (contract surface)
 - `new DialogSystem({ ui, bus, getFlags, setDialogActive, getNode? })` — ui:
@@ -292,8 +312,9 @@ render at order 100 runWhenPaused, input.lateUpdate at 1000).
 - boundPassable: the creek-narrows water collider [B1] is picked out of
   exterior.colliders BY VALUE (aabb x −10..−6, z 4..6) in main.ts — if B-world retunes
   the creek in M2, update that match (or tag the collider properly).
-- **DEV-PROVISIONAL registrations in main.ts (ids `dev-*`) — questScript MUST replace
-  all of them** (single block, clearly marked): `dev-gate` (gate E-opens, humanOnly —
+- **DEV-PROVISIONAL registrations in main.ts (ids `dev-*`) — DONE: all replaced by
+  questScript.ts on 2026-06-12 (D2 notes below)** (single block, clearly marked):
+  `dev-gate` (gate E-opens, humanOnly —
   replace w/ tutorial F-beat), `dev-door-exterior` (door bubble dlg.m.doorBlocked — no
   flags set; replace w/ step-2 logic + door.blocked dialog), `dev-window-leap` (fox E →
   enterInterior(windowLanding) — no leap parabola/cutscene yet), `dev-int-door` +
@@ -328,6 +349,88 @@ render at order 100 runWhenPaused, input.lateUpdate at 1000).
   preview tab was background-throttled (rAF 0–6 fps) — all timing-sensitive checks were
   done via teleports/state reads; a human playtest at 60 fps is still wanted in M1
   VERIFY.
+
+### M1 D2 questScript — notes (2026-06-12)
+Files: NEW gameplay/questScript.ts · main.ts (DEV block removed; QuestScript
+constructed + update(dt) wired after interactions; F-gated behind hasMask; debug
+handle extended) · wind.ts (ONE additive method `triggerGustNow()` — fires a full
+telegraph→lash cycle if calm/enabled; the scripted first gust past the gate) ·
+i18n/en.ts + cs.ts (+3 keys each, parity kept: `whisper.mask`, `cut.1`, `cut.2`
+— 134 keys per locale now).
+- **F-gate (main.ts):** pre-mask, a just-pressed `transform` swallows the whole
+  just-pressed set for that frame via input.clearPressed() (no per-action API;
+  same-frame F+E collision is the only casualty and is unreachable in practice).
+- **Mask beat:** cutscene phase 3 s — burst VFX at 'shrine-mask' (mesh hidden) →
+  hasMask + FORCED avatar.setForm('fox') + FormChanged emitted by questScript →
+  violet `whisper.mask` → back to play. hasTransformed flips false→true inside
+  the beat.
+- **Dialog auto-offer:** ghost r 3 trigger re-fires after dialogs because
+  disabled-while-inside fires onExit — guarded with a suppression flag set on
+  DialogEnded(main.* with questProgress 0) and cleared only once the player is
+  >4.5 u from the ghost (canon "re-approach re-offers"). Manual Talk interactable
+  bypasses suppression. Same pattern guards Dialog 6.
+- **Interior optionals use the bubble channel** (DESIGN §5 channel 2), not the
+  dialog panel: table/futon/scare/papersAfter/sandals/doorBlocked go through
+  screens.showBubble with flags set by questScript. The M0 dialog nodes int.*/
+  door.blocked stay in data/dialogs.ts unused (harmless; M4 may delete).
+- **Scare (Dialog 4):** futon Explore → 1.5 s → GustStart('lash')+GustEnd
+  emitted as audio-only events (wind itself stays disabled inside), paperRustle,
+  0.3 s camera shake, papers tossed ballistically by questScript (settle keeps
+  drifted XZ), "Ah!" then "Stupid wind." One-shot; skipped (still marked done)
+  if the player flees the interior within the delay.
+- **Window leap:** scripted 0.6 s parabola on the avatar root, fade-swap fires
+  at 45 % of the arc; teleport+idle on landing comes free from sceneDirector.
+- **Branch cuts:** positions from cuttableBranches world transforms; enabled
+  only exterior + step 5 + hasDagger + human + wind.phase !== 'lash' (+ a busyT
+  anim lock so E can't double-fire during the 0.5 s cut). Cuts persist across
+  knockdowns. After the 3rd cut wind.setPlayer(null) — she's freed, so no
+  knockdowns during thanks/bow/dissolve (wind stops forever moments later).
+- **THE SEQUENCE:** DialogEnded('thanks') → cutscene → standAndBow (3.6 s) →
+  dissolve 3 s (setDissolve lerp + 3 ghostSmokePuffs + ghostDissolved SFX) →
+  GhostDissolved + wind.stopForever() (WindStopped) → 2 s held quiet → body
+  marker wisp visible + phase play. Body Explore → paper overlay (canon body
+  text) → close → questProgress 7 + QuestStepCompleted(6) → QuestSystem emits
+  QuestCompleted → 1.5 s hold → ending screen (medallion card + prose).
+- **Guide kitsunebi:** 2 extra wisps (createWisps, homes mutated live) ease
+  toward the current objective (shrine → willow → door → window → willow →
+  body mound), hidden while interior or quest done; + 1 dedicated marker wisp
+  at the body mound lit after the dissolve.
+- **RESTART = full window.location.reload()** (pause Restart, ending R AND
+  ending Esc-to-title — reload boots to title anyway). Chosen because
+  wind.stopForever() is one-way and branchFallFade disposes the cut meshes;
+  reload is deterministic and instant in an asset-free app. In-memory restart
+  (straight back to PLAY) is M4 polish if wanted.
+- **Deviations / M2+ notes:** dagger HUD icon by the objective line (DESIGN §9
+  "quiet dagger icon") NOT added — hud.ts is E-ui-owned; the banner refresh to
+  Objective 4 carries the information for M1. yanagi.fear brace-whisper near
+  her during a post-step-5 lash IS implemented (once per gust) but was only
+  code-reviewed, not browser-verified (timing-fiddly headless). The
+  hint.move glyph can be cleared early by main's GustEnd hint handler if a
+  gust cycles during the title screen (cosmetic, pre-existing handler).
+- **VERIFY (scripted browser run, vite dev, EN then CS, zero console
+  errors/warnings):** move glyph + F dormant pre-mask ✓ shrine beat (cutscene
+  → forced fox → whisper → unlock, mask hidden) ✓ F toggles after ✓ creek
+  Bound whisper + Bound across narrows + water blocks walking ✓ gate fox
+  crossed-paw + "F — transform" hint → F → E opens ✓ scripted first gust
+  trigger fired (telegraph on field entry) + brace hint at lash + stagger
+  1.28 u/s + brace immunity ✓ ambient whisper at 15 m (canon line) ✓ Dialog 1
+  auto at 3 m → Z1 refusal (no quest, questRefused, no banner, no re-offer
+  loop while standing inside) → walk away → re-approach re-offers → full
+  A1→B1→C3→D2→E2→F1→G1 → QuestStarted + Objective 1 banner ✓ door bubble +
+  step 1→2 ✓ fox window leap → interior + step 2→3 ✓ table/futon bubbles +
+  shutter-slam scare ("Ah!"/"Stupid wind.", shake, papers) ✓ diary overlay
+  (4 canon fragments) → sad bubble ✓ drawer Explore as fox → dagger Take
+  crossed-paw → F → Take (hasDagger, step 3→4, mesh hidden) ✓ sandals
+  Explore→Remove → door exit → exterior ✓ door re-entry + window leap-out
+  (BOTH exits) ✓ Dialog 6 auto at willow → step 4→5 + calm 8–10 ✓ branch
+  prompts disabled during lash + lash-zone knockdown + E-mash recover ✓ cuts
+  1/2 with counter bubbles in calm windows, fox E correctly refused ✓ 3rd cut
+  → Dialog 7 → bow → dissolve → wind stopped (strength 0, world still) → 2 s
+  quiet → marker wisp + Objective 6 ✓ body overlay → progress 7 + "Quest
+  completed" + medallion card + ending prose ✓ R → reload → title → fresh
+  flags → shrine beat + Dialog 1 re-offer work again ✓ CS: live L-toggle
+  mid-dialog re-renders choices, Dialog 1 CS lines verbatim, title "Nářek pod
+  vrbou" ✓. tsc + vite build green; purity grep clean.
 
 ### M0 notes / deviations
 - EN quest title authored as "Cry under the Willow" per build order; canon EN doc's
