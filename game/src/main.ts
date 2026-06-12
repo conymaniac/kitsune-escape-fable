@@ -15,7 +15,9 @@ import { GameLoop } from '@/core/loop';
 import { Input } from '@/core/input';
 import { GameDirector } from '@/core/director';
 import { palette } from '@/style/palette';
-import { createMaterialKit } from '@/style/materials';
+import { bindWindUniforms, createMaterialKit } from '@/style/materials';
+import { makeExteriorRig, makeInteriorRig } from '@/style/lighting';
+import { createPostFx } from '@/style/postfx';
 import { createAudio } from '@/audio/engine';
 import { createUiRoot } from '@/ui/uiRoot';
 import { createHud } from '@/ui/hud';
@@ -73,37 +75,32 @@ const canvas = document.getElementById('app-canvas') as HTMLCanvasElement;
 const renderer = new Renderer(canvas);
 renderer.setClearColor(palette.nightDeep);
 const isoCam = new IsoCamera(renderer.aspect);
-renderer.onResize((aspect) => isoCam.resize(aspect));
+const postfx = createPostFx(renderer.gl);
+renderer.onResize((aspect, w, h) => {
+  isoCam.resize(aspect);
+  postfx.resize(w, h);
+});
 
 // ─────────────────────────────────────── worlds (built once at boot) ──
 const exterior = buildExterior(kit);
 const interior = buildInterior(kit);
 
 const exteriorScene = new THREE.Scene();
-exteriorScene.fog = new THREE.Fog(palette.nightDeep, 40, 120);
 exteriorScene.add(exterior.group);
 
 const interiorScene = new THREE.Scene();
-interiorScene.add(interior.group); // carries its own placeholder lights
+interiorScene.add(interior.group);
 
-// Exterior light rig (placeholder until stream A's lighting.ts — spec §7):
-// moon key w/ ONE 1024² shadow map on a tight 40×40 frustum that follows
-// the player, hemisphere fill, warm no-shadow rim.
-exteriorScene.add(new THREE.HemisphereLight(palette.nightHorizon, 0x1a1228, 0.6));
-const moon = new THREE.DirectionalLight(palette.moonlight, 1.2);
-moon.castShadow = true;
-moon.shadow.mapSize.set(1024, 1024);
-moon.shadow.camera.left = -20;
-moon.shadow.camera.right = 20;
-moon.shadow.camera.top = 20;
-moon.shadow.camera.bottom = -20;
-moon.shadow.camera.near = 1;
-moon.shadow.camera.far = 90;
-moon.shadow.bias = -0.002;
-exteriorScene.add(moon, moon.target);
-const rim = new THREE.DirectionalLight(palette.lanternAmber, 0.35);
-rim.position.set(18, 8, 22);
-exteriorScene.add(rim);
+// Light rigs + fog (style/lighting.ts — spec §7 budgets). The interior
+// build still carries B-world's M1 placeholder lights inside its group —
+// strip them before the real rig lands (B-world removes them in M2).
+const placeholderLights: THREE.Object3D[] = [];
+interior.group.traverse((obj) => {
+  if ((obj as THREE.Light).isLight) placeholderLights.push(obj);
+});
+for (const light of placeholderLights) light.removeFromParent();
+const extRig = makeExteriorRig(exteriorScene);
+const intRig = makeInteriorRig(interiorScene);
 
 /** Mark meshes for the shadow pass (transparent mats never cast). */
 function enableShadows(root: THREE.Object3D): void {
@@ -137,6 +134,7 @@ const yanagiMotion: MotionState = { speed: 0, heading: 0, grounded: true };
 // ──────────────────────────────────────────────── gameplay systems ──
 const wind = new WindSystem(bus, 0xf0c5);
 wind.setLashZones(exterior.lashZones);
+bindWindUniforms(wind.uniforms); // water/sway/ghost/wisp shader clock
 
 const player: PlayerController = new PlayerController({
   avatar,
@@ -345,13 +343,14 @@ loop.add((rawDt) => {
     exterior.update(dt, wind.state);
     yanagi.setWindSway(wind.state.strength);
     yanagi.update(dt, yanagiMotion);
-    // Moon shadow frustum follows the player along the playable spine.
-    moon.position.set(player.pos.x - 12, 24, player.pos.z - 8);
-    moon.target.position.copy(player.pos);
+    extRig.flicker(dt, wind.state.strength);
+  } else {
+    intRig.flicker(dt);
   }
   vfx.update(dt);
 
-  // camera: diorama drift on title/intro, follow in play
+  // camera: diorama drift on title/intro, follow in play.
+  // The moon shadow frustum tracks whatever the camera looks at.
   if (director.phase === 'title' || director.phase === 'intro') {
     dioramaTarget.set(
       exterior.anchors.willow.x + Math.sin(elapsed * 0.07) * 5,
@@ -359,15 +358,27 @@ loop.add((rawDt) => {
       exterior.anchors.willow.z + Math.cos(elapsed * 0.07) * 3.5,
     );
     isoCam.update(dt, dioramaTarget, null);
+    extRig.follow(dioramaTarget);
   } else {
     isoCam.update(dt, player.pos, player.velocity);
+    if (sceneDir.active === 'exterior') extRig.follow(player.pos);
   }
 
   // audio tick
   audio.update(dt, wind.state.strength);
 }, 0);
 
-loop.add(() => renderer.render(sceneDir.activeScene, isoCam.camera), 100, true);
+// render through the postfx composer (bloom → vignette/grade → output);
+// setScene every frame keeps the swap seam trivial (sceneDirector flips
+// activeScene mid-fade — postfx simply follows).
+loop.add(
+  (dt) => {
+    postfx.setScene(sceneDir.activeScene, isoCam.camera);
+    postfx.render(dt);
+  },
+  100,
+  true,
+);
 loop.add(() => input.lateUpdate(), 1000, true);
 
 // ─────────────────────────────── boot flow: title → intro → play ──
@@ -411,6 +422,10 @@ if (import.meta.env.DEV) {
     wind,
     director,
     isoCam,
+    postfx,
+    extRig,
+    intRig,
+    kit,
     dialog: dialogSystem,
     questScript,
     screens,
