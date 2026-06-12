@@ -4,20 +4,56 @@
     {
       "name": "game-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "game", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "game",
+        "run",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "game-dev-b",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--prefix", "game", "vite", "game", "--port", "5180", "--strictPort"],
+      "runtimeArgs": [
+        "--prefix",
+        "game",
+        "vite",
+        "game",
+        "--port",
+        "5180",
+        "--strictPort"
+      ],
       "port": 5180
     },
     {
       "name": "game-dev-c",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--prefix", "game", "vite", "game", "--port", "5184", "--strictPort"],
+      "runtimeArgs": [
+        "--prefix",
+        "game",
+        "vite",
+        "game",
+        "--port",
+        "5184",
+        "--strictPort"
+      ],
       "port": 5184
+    },
+    {
+      "name": "game-prod-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--prefix",
+        "game",
+        "vite",
+        "preview",
+        "game",
+        "--port",
+        "4173",
+        "--strictPort"
+      ],
+      "port": 4173
     }
   ]
 }

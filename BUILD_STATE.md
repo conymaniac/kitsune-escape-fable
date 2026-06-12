@@ -72,13 +72,13 @@ Branch: `claude/wonderful-mclean-bad83d`. New app: `game/`. CLEAN-ROOM: never to
 - [ ] COMMIT M4
 
 ## M5 — Ship
-- [ ] Perf audit vs budgets; asset-purity grep clean
-- [ ] game/README.md (how to play, controls EN+CS, slice scope) + docs/DECISIONS.md
-- [ ] gh repo create conymaniac/kitsune-escape-fable + push branch as main
-- [ ] Vercel: rename project-adq26 → kitsune-escape-fable; cd game && npx vercel link &&
+- [x] Perf audit vs budgets; asset-purity grep clean
+- [x] game/README.md (how to play, controls EN+CS, slice scope) + docs/DECISIONS.md
+- [x] gh repo create conymaniac/kitsune-escape-fable + push branch as main
+- [x] Vercel: rename project-adq26 → kitsune-escape-fable; cd game && npx vercel link &&
       npx vercel --prod
-- [ ] Verify https://kitsune-escape-fable.vercel.app playable
-- [ ] FINAL COMMIT + report
+- [x] Verify https://kitsune-escape-fable.vercel.app playable
+- [x] FINAL COMMIT + report
 
 ## Produced artifacts log
 - docs/DESIGN.md — game design of record
@@ -995,3 +995,10 @@ ceiling, so NO calm-window tuning was needed (wind.ts untouched).
    flagged for design awareness.
 6. Ending screen R/Esc + pause Restart remain full page reloads (M1
    decision, unchanged).
+
+- M5 SHIPPED (2026-06-12): GitHub https://github.com/conymaniac/kitsune-escape-fable
+  (branch pushed as main). Vercel project project-adq26 renamed to
+  kitsune-escape-fable (team kitsune-escape), game/ linked, deployed --prod.
+  LIVE + verified: https://kitsune-escape-fable.vercel.app (200, bundle 1.01 MB,
+  production artifact browser-verified: title EN/CS, intro, play boots, player
+  moves, HUD live, console clean — Tone.js banner only).
