@@ -199,7 +199,7 @@ export const en = {
     'A mother holds on. Even when the wind is stronger than she is. Even when nothing is left of her but the holding.',
   'end.5':
     'Mizumi thinks of her own home. Of the door she slammed. Of words that whipped like branches in the wind.',
-  'end.6': "Maybe her dad's forbiddings are a kind of holding on too. Clumsy. Too tight. But holding.",
+  'end.6': "Maybe her dad's rules are a kind of holding on too. Clumsy. Too tight. But holding.",
   'end.7':
     "It's okay to be different. And the ones closest to you stay your stable point — even when you run from them into the night.",
   'end.8':

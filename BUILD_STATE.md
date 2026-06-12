@@ -59,10 +59,13 @@ Branch: `claude/wonderful-mclean-bad83d`. New app: `game/`. CLEAN-ROOM: never to
 - [x] COMMIT M3
 
 ## M4 — Juice & polish
-- [ ] P1 gameplay feel: gust/knockdown tuning, papers, camera micro-moves, leap arc,
-      cut/dissolve/wind-stop cutscene timing
-- [ ] P2 presentation: ghost dissolve, title diorama, screen transitions, medallion,
-      bloom/fog grading, EN+CS proofing in context
+- [x] P1 gameplay feel: gust/knockdown tuning, papers, camera micro-moves, leap arc,
+      cut/dissolve/wind-stop cutscene timing + occluder fade (C-chars issue #2)
+      — browser-verified, see M4 P1 notes
+- [x] P2 presentation: ghost dissolve erosion, reveal ink-grade hook, medallion
+      stamp+bloom, title/intro/ending/pause/paper polish, hold-Esc skip, dagger
+      icon, EN+CS proofing in context — browser-verified, see M4 P2 notes
+      (ONE optional main.ts one-liner left for P1/playtest: pause volume hook)
 - [ ] PLAYTEST: full walkthrough incl. Z1/Z2 refusal branches, both cottage exits, both locales
 - [ ] COMMIT M4
 
@@ -666,6 +669,198 @@ complete — NOT touched.
   scripted verification: rAF parks between bursts — patch rAF to setTimeout
   AND force one frame (screenshot) before timing-sensitive checks; loop-
   driven key handling (M, F) queues until frames tick.
+
+### M4 P1 gameplay-feel — notes (2026-06-12)
+Files: NEW gameplay/occluderFade.ts + gameplay/papers.ts · engine/camera.ts
+(speed-zoom breathing + setRumble) · gameplay/wind.ts (once-per-gust knock +
+shader-clock wind-down) · gameplay/player.ts (knockdown cost + guards) ·
+gameplay/questScript.ts (leap/scare/finale/dolly/first-gust) · main.ts
+(wiring, hint guard, lash rumble) · SURGICAL world touches: willow.ts
+(canopy mesh named+tagged occluder/noMerge) + exterior.ts (tagCanopyOccluder
+on the 6 field-tree singles). All browser-verified on :5173 (scripted
+foreground-frame runs via rAF→setTimeout pump; NOTE: every tab wake makes
+the vite client full-reload the page — patch rAF, force one frame via
+screenshot, THEN drive, all in one eval).
+- **Occluder fade (C-chars open issue #2 — REQUIRED, now fixed):** meshes
+  tagged `userData.occluder` (4 willow leaf-curtain canopies + 6 field-tree
+  crowns; 10 total) are collected once with world bounding spheres; per
+  frame each is tested against the fixed player→camera ray (one dot product
+  + perp distance vs sphere radius +0.4 m margin — NO raycast). Opacity
+  eases to 0.15 (rate 9/s in, 3.5/s out, transparent flips back off when
+  restored). Materials clone-on-first-fade per mesh (kit mats are shared)
+  and re-inject the sway patch (Material.clone() drops onBeforeCompile —
+  faded curtains keep swaying). The bark skeleton stays opaque → faded
+  canopy reads as the DESIGN §4 "ink outline". VERIFIED: S/SE finale
+  approach — Yanagi + player fully readable under the cursed willow
+  (screenshot); row willows fade while walking the shore path; full
+  restore when clear. Cost: +10 potential draws (frustum-culled); shore
+  hotspot measured ~121 scene draws/frame (~137 incl. composer) — right at
+  the ≤120 budget line, flagged for the M5 audit (cheapest trim: untag
+  some field trees or accept).
+- **papers.ts:** interior 7 sheets — rest-pose springs, slam(dir) impulse
+  (lift 1.9–3.2, tumble axis+spin, paper terminal fall 1.15 u/s w/ side-
+  slip glide), touchdown slerps flat over 0.45 s keeping drifted XZ
+  (room-clamped ±4.6/±3.5), barely-there idle micro-yaw stir at rest.
+  Scare now calls papers.slam(-0.9,0.25) (blast in from the EAST window) +
+  camera shake 0.22→0.32 amp/0.3→0.4 s. 3 loose LEAVES on the willow-shore
+  path: rest in calm → skitter hops on telegraph (the leaf-streak cue) →
+  airborne downwind streaks during lash → settle; quiet respawn at home
+  past 11 u during calm; lie flat forever after WindStopped.
+- **Camera micro-moves (juice #8):** speed-zoom breathing — frustum eases
+  to ×1.02 at full sprint, back at rest (measured 1.0→1.0199→1.0);
+  setRumble(amp) continuous sin-based micro-shake wired in main to lash
+  proximity (0.055·prox²·strength near lash zones, ≈0.017–0.03 u measured,
+  0 in calm); reveal dolly — approaching the body mound (<5.5 u) post-
+  dissolve eases viewHeight 14→12.9 (~8 %) over 2.6 s, releases >8 u
+  (hysteresis latch; verified both ways); interior tighten 14→9 re-verified
+  (=9.0 after leap); transform punch-zoom + 0.2 s lock + time-dip chain
+  re-verified firing in order.
+- **Knockdown/gust (DESIGN §3 + juice #14):** auto bail-out 2.0→2.6 s
+  (3×E mash still ≈1–1.5 s — mashing now actually pays), push time 0.45→
+  0.5 s, +0.25 s snap-free control lock + dust poof on recovery. Measured:
+  4-press escape, 1.8 s down. NEW fairness rules: (1) a lash zone knocks
+  down at most ONCE per gust — was a knock-LOCK loop when recovering deep
+  inside a zone (re-knock on grace expiry, E-mash could never win); only a
+  LANDED knock arms the rule, so dropping brace mid-lash stays punishable
+  (verified: 0 re-knocks standing in-zone through a whole lash). (2) no
+  knockdowns while !canPlayerAct() — the ghost STANDS inside the cursed
+  lash zone, so Dialog 1/6/7 could be interrupted by a tumble under the
+  panel. Fox knockdown in lash zones re-verified (both forms per design);
+  brace stagger/knock immunity unchanged.
+- **Leap arc:** 0.6→0.7 s (TECH_SPEC), height 1.35→1.55 (crate stack tops
+  1.4 — visible clearance). Measured peak y 1.54, land+fade 0.93 s total,
+  interior swap mid-arc clean.
+- **Finale timing (the silence):** bow → +0.45 s held breath → 3.0 s
+  dissolve → WindStopped → 3.0 s quiet (was 2.0) → marker + control.
+  stopForever now ALSO winds the shared shader clock down to a halt
+  (strength drains in ~1 s at rate 3.2, uTime rate eases 1→0 in ~3 s) —
+  the sway shader keeps an idle breath at strength 0 and water keeps
+  scrolling, so freezing uTime is what actually delivers "willows dead
+  still, lake to glass". Verified trace: cuts 0.6/1.4/2.2 s → Dialog 7 at
+  +0.9 → DialogEnded → bow → GhostDissolved+WindStopped at +7.0 →
+  CutsceneEnd exactly +3.0 later; strength 0.185→0 in ~2 s; clock frozen
+  by control return; ≥2 s of true stillness before the marker lights.
+- **Tutorial (DESIGN §8):** full corridor re-walked fresh — move glyph
+  clears on first input ✓ shrine beat (cutscene, mask hidden, forced fox,
+  whisper) ✓ gate crossed-paw + "F — transform" hint → F → E opens ✓
+  scripted first gust now has TWO wide volumes (field r 8 at (-15,-4.5)
+  gated on gateOpened + shore r 6 at (7,-3) for the reed-tunnel fox route,
+  shared one-shot guard) — fires reliably on field entry ✓. main.ts GustEnd
+  hint-clear now only clears the brace glyph it owns (a gust cycling can
+  no longer eat the move/transform tutorial glyphs).
+- **VERIFY:** tsc + vite build green; purity + raw-hex greps clean; zero
+  console errors/warnings across the whole scripted session; screenshots
+  taken: finale-approach occluder fade, papers mid-flutter post-slam,
+  reveal-dolly held shot at the marker.
+- **Open issues / handoffs (playtest):** (1) shore-hotspot draw calls ~121
+  vs ≤120 — M5 audit call. (2) Knockdown push distance varies with terrain
+  (3 m nominal, less when slid into the lake-shore collider) — feels fine,
+  watch in human playtest. (3) The synthetic walk can't judge SFX mix of
+  the new beats (slam punch-up, silence drain) — human ears wanted at the
+  M4 PLAYTEST line. (4) Pause-menu volume slider still placeholder (P2).
+  (5) The guide-wisp pair + marker wisp keep drifting after WindStopped
+  (intended — spirit lights, not foliage); flag if it reads wrong.
+
+### M4 P2 presentation — notes (2026-06-12)
+Files: style/postfx.ts (grade system) · style/shaders/ghost.ts (erosion-led
+dissolve + up-bias + setGhostDissolve helper) · characters/yanagi.ts
+(setDissolve → erosion path; ease-in draw-up 0.85 u) · characters/vfx.ts
+(ghostSmokePuffs richer/longer; POOL_SMOKE 16→28) · ui/screens.ts ·
+ui/hud.ts · ui/dialogUi.ts · ui/styles.css · i18n/en.ts (1 proofing fix).
+Browser-verified on :5184 (preview MCP; MessageChannel rAF pump — the
+setTimeout patch throttles to 1 Hz in background tabs, MessageChannel
+doesn't; force one frame via screenshot so the parked loop re-arms into
+the patched rAF).
+- **GRADE HOOK (the reveal, DESIGN §5) — WIRED, no main.ts changes
+  needed:** postfx.ts now has `setGrade(name, tweenSec)` on the PostFx
+  instance + a module-level `setGlobalGrade()` proxy. Grades: 'normal' ·
+  'inkReveal' (selective desat to ink-and-bone — violet hues exempt via a
+  chroma test, vignette 0.56) · 'pauseDim' · 'dawn'. screens.ts (which
+  owns the cinematic moments AND has the bus) drives it event-side:
+  GhostDissolved arms the reveal → the NEXT showPaper (the body text, by
+  canon order) tweens to 'inkReveal' over 1.8 s and the paper backdrop
+  goes see-through (`.ke-paper.is-reveal` — overlay floats low over the
+  HELD SHOT); showEnding eases to 'dawn' over 7 s; pause ↔ 'pauseDim'.
+  P1/questScript may ALSO call setGlobalGrade()/postfx.setGrade() directly
+  for extra beats — it tweens from current values, last call wins.
+- **Ghost dissolve (juice #13):** the shader's uDissolve cutoff is now
+  driven DIRECTLY (new exported setGhostDissolve(mat, t); yanagi falls
+  back to the old opacity fade on stub kits). Body opacity holds ~full
+  until t≈0.75 then fades — she visibly TATTERS instead of cross-fading.
+  Cutoff biased +vUv.y·0.55 → erodes bottom-up ("drawn up by one last
+  gust"); violet edge band widened (smoothstep 0.22) at 2.6× — blooms
+  gently, capped by the hardened high-pass. The vfx smoke `.opacity`
+  proxy path is untouched (puffs still fade-and-tatter). Verified at
+  dissolve 0.32/0.55 closeups: bottom-up erosion + violet edges read.
+- **Medallion ink-stamp (juice #16):** ending card hidden until
+  `.is-stamped` (+700 ms) → hanko slam (scale 2.1→0.93→1.03→1, blur-in,
+  gold drop-shadow pulse) + `.ke-medallion-bloom` vermillion radial flash
+  behind the coin. Prose starts +2.4 s, then one line / 2.6 s, each line
+  ink-WRITES itself L→R (clip-path wipe + blur dry). Ending backdrop is
+  now a translucent vignette — prose paces over the LIVE still-lake shot
+  with the dawn grade (DESIGN §6). Any key fast-forwards; R/Esc reload.
+- **Intro:** hold-Esc-1 s skip implemented (DESIGN §6; M0 deviation
+  resolved) w/ vermillion fill meter next to the skip label (interval-
+  driven — rAF throttling immune); tap does nothing. 7 drifting ember
+  petals per beat panel (pure CSS).
+- **Title:** ensō now brush-draws itself (stroke-dash) + slow breathe;
+  calligraphy blur-in + 11 s float drift. BUG FIXED: L on the title
+  screen toggled the locale TWICE (screens' own toggle + main loop's
+  input handler) — net no-op at 60 fps. Title now swallows L/M (so they
+  don't "press any key"-start the game) and lets main's handler own the
+  toggle; the title re-renders via the existing onLocaleChange hook.
+- **Pause:** paper scroll got wooden rollers + unroll animation + lined-
+  washi grain; world behind drains via 'pauseDim' (DESIGN §6 "frozen/
+  desaturated" — render keeps running while updates pause, so the tween
+  shows). Volume slider now CALLS `screens.setAudioHooks({
+  setMasterVolume })` if wired — **HANDOFF (one line, main.ts, P1 or
+  playtest):** `screens.setAudioHooks({ setMasterVolume: (v) =>
+  audio.setMasterVolume(v) });` (AudioHandle.setMasterVolume has been
+  ready since M3). Without it the slider stays visual-only.
+- **Paper overlay (juice #12):** lines now ink-DRAW (clip-path wipe +
+  blur-bleed dry, 1.05 s stagger) over an extra paper-fiber gradient
+  layer. Reveal variant documented above.
+- **HUD/dialog (juice #2/3/7):** interact prompt fades-up + settles on
+  appear, [E] keycap bobs (display-flip restarts CSS anim; interactions
+  only calls setPrompt on change — verified). Quiet dagger icon (DESIGN
+  §9): inline tantō SVG by the objective title, shown by KEY INFERENCE
+  (obj4/5/6 titles ⇔ hasDagger true by quest construction) — zero event
+  wiring needed, fades/rotates in on banner reveal. Typewriter now
+  breathes at punctuation (setTimeout chain: 260 ms after .!?…, 120 ms
+  after ,;:—; blips skip punctuation/quotes); choices brush-in staggered
+  80 ms. Banner/brush-stroke + wiggle kept from M1.
+- **Grading final pass:** 'normal' grade values unchanged from the M2
+  audit (bloom .85/.35/.4, vignette .42, grain 0.015 ≤ cap). New ink ramp
+  tuned in-browser: shadows → inkCharcoal·0.55 (indigo-charcoal, never
+  black), bone ramp smoothstep(0.015,0.55) so the held shot reads as an
+  ink-wash page, not murk. Checked beats: title diorama, willow shore,
+  cottage window pull, interior andon, reveal, ending — deep indigo
+  everywhere, no wash-out.
+- **EN+CS proofing (in context, both locales):** canon lines verified
+  VERBATIM against _extracted/ ("Ach áno", "Ublížili mi", "But it can't.",
+  "Yes. I managed to find her.", paper fragments, "Přeseknout větve vrby"
+  objective — all canon, kept). ONE fix in OUR authored text: EN end.6
+  "dad's forbiddings" → "dad's rules" (CS untouched). Played in browser:
+  title/intro/pause/controls CS ✓ full Dialog 1 tree walked in CS (10
+  nodes incl. C1/D1/E1 + C3/D2/E2/F1/G1, all diacritics correct) ✓ diary
+  overlay CS ✓ Dialog 6 EN ✓ body text EN ✓ ending EN + CS (medallion
+  card, lore, 10 prose lines — no overflow) ✓ pause buttons fit ✓.
+  i18n parity intact (compile-enforced; build green).
+- **VERIFY:** tsc + vite build green ×3 during the pass; purity grep
+  clean; zero console ERRORS across the whole scripted session.
+  Screenshots taken: title EN + CS, intro beat w/ embers + skip meter,
+  obj4 banner w/ dagger icon, Dialog 6 panel, dissolve mid-erosion
+  closeup (0.32), body reveal w/ ink grade over held shot, ending EN
+  (stamp + prose over lake), ending CS, pause scroll CS w/ pauseDim.
+- **Open issues / handoffs (playtest):** (1) the pause-volume one-liner
+  above. (2) Tone.js "Max polyphony exceeded. Note dropped." warnings
+  appeared ONLY under the accelerated scripted run (compressed cut/blip
+  bursts) — audio/ is F-owned; if a human 60 fps run reproduces it, raise
+  polyphony or throttle dialogBlip. (3) Optional P1 polish: a slow camera
+  drift toward the lake during phase 'ending' would sell DESIGN §6's
+  "drift across the still lake" (the lake already sits in frame from the
+  willow shore, so this is a nice-to-have). (4) Locale persists in
+  localStorage — a CS playtest follows EN unless cleared (kitsune.locale).
 
 ### M0 notes / deviations
 - EN quest title authored as "Cry under the Willow" per build order; canon EN doc's

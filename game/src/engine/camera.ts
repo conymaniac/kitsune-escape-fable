@@ -10,6 +10,13 @@
  * exponential follow, so the camera eases into the limit), translation
  * shake(amp, durSec) and a punch-zoom impulse for the transform burst.
  *
+ * M4 micro-moves (juice #8):
+ * - speed-zoom breathing: the frustum eases out ≤2 % at full sprint and
+ *   back at rest — sprinting "opens" the world a touch.
+ * - setRumble(amp): continuous sin-based micro-shake, set per frame by
+ *   main while a lash whips near the player (0 disables). Unlike
+ *   shake(), it never decays — the caller owns the envelope.
+ *
  * The view direction never changes, so the rotation is computed once and
  * per-frame work is position + frustum only. No per-frame allocations.
  */
@@ -23,6 +30,10 @@ export const VIEW_HEIGHT_INTERIOR = 9;
 
 const FOLLOW_RATE = 6;
 const LOOK_AHEAD_SEC = 0.15;
+/** Speed-zoom breathing: ≤2 % frustum ease-out at full sprint (5 u/s). */
+const SPEED_ZOOM_AMOUNT = 0.02;
+const SPEED_ZOOM_FULL = 5;
+const SPEED_ZOOM_RATE = 2.5;
 
 export interface CameraBounds {
   minX: number;
@@ -59,6 +70,13 @@ export class IsoCamera {
   private punchDur = 0.2;
   private punchT = Number.POSITIVE_INFINITY;
 
+  // speed-zoom breathing (smoothed frustum scale, 1 .. 1+2 %)
+  private speedZoom = 1;
+
+  // continuous micro-rumble (gust lash near lash zones); caller-owned amp
+  private rumbleAmp = 0;
+  private rumbleT = 0;
+
   constructor(aspect: number) {
     this.aspect = aspect;
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
@@ -73,7 +91,7 @@ export class IsoCamera {
 
   resize(aspect: number): void {
     this.aspect = aspect;
-    this.applyFrustum(this.currentPunchScale());
+    this.applyFrustum(this.currentPunchScale() * this.speedZoom);
   }
 
   /** Tween the frustum height (exterior 14 ↔ interior 9). */
@@ -83,7 +101,7 @@ export class IsoCamera {
       this.vhFrom = h;
       this.vhTo = h;
       this.vhT = 1;
-      this.applyFrustum(this.currentPunchScale());
+      this.applyFrustum(this.currentPunchScale() * this.speedZoom);
       return;
     }
     this.vhFrom = this.viewHeight;
@@ -111,6 +129,14 @@ export class IsoCamera {
     this.punchT = 0;
   }
 
+  /**
+   * Continuous micro-shake amplitude (gust lash near a lash zone).
+   * Caller sets it every frame; 0 disables. Never decays on its own.
+   */
+  setRumble(amp: number): void {
+    this.rumbleAmp = amp;
+  }
+
   /** Hard-snap the follow point (scene swaps, spawn). */
   snapTo(target: THREE.Vector3): void {
     this.desired.copy(target);
@@ -134,12 +160,15 @@ export class IsoCamera {
     }
 
     // punch envelope
-    let punchScale = 1;
-    if (this.punchT < this.punchDur) {
-      this.punchT += dt;
-      punchScale = this.currentPunchScale();
-    }
-    this.applyFrustum(punchScale);
+    if (this.punchT < this.punchDur) this.punchT += dt;
+
+    // speed-zoom breathing (≤2 % out at sprint, eased)
+    const speed = velocity ? Math.hypot(velocity.x, velocity.z) : 0;
+    const speed01 = Math.min(speed / SPEED_ZOOM_FULL, 1);
+    const zoomTarget = 1 + SPEED_ZOOM_AMOUNT * speed01;
+    this.speedZoom += (zoomTarget - this.speedZoom) * (1 - Math.exp(-dt * SPEED_ZOOM_RATE));
+
+    this.applyFrustum(this.currentPunchScale() * this.speedZoom);
 
     // exponential follow toward the (clamped) look-ahead point
     this.desired.copy(target);
@@ -160,6 +189,16 @@ export class IsoCamera {
       );
     } else {
       this.shakeOffset.set(0, 0, 0);
+    }
+
+    // continuous micro-rumble (sin-based — calm at 60 fps, no jitter)
+    if (this.rumbleAmp > 0.0005) {
+      this.rumbleT += dt;
+      const rt = this.rumbleT;
+      const a = this.rumbleAmp;
+      this.shakeOffset.x += a * (Math.sin(rt * 27.1) * 0.6 + Math.sin(rt * 17.3) * 0.4);
+      this.shakeOffset.y += a * 0.6 * (Math.sin(rt * 23.7 + 1.3) * 0.7 + Math.sin(rt * 31.9) * 0.3);
+      this.shakeOffset.z += a * (Math.sin(rt * 19.3 + 2.1) * 0.6 + Math.sin(rt * 29.3) * 0.4);
     }
 
     this.applyPosition();

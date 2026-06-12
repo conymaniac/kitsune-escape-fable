@@ -214,7 +214,15 @@ export function buildWillow(kit: MaterialKit, options: WillowOptions = {}): Will
     bake(ribbon, Math.cos(a) * rr, crownY + height * 0.12, Math.sin(a) * rr, Math.PI / 2 - a);
     curtainGeoms.push(ribbon);
   }
-  group.add(new THREE.Mesh(mergeGeoms(curtainGeoms), leafMat));
+  // The leaf-curtain canopy is an OCCLUDER (M4 gameplay/occluderFade.ts —
+  // DESIGN §4 fade to ~15 %): tagged + noMerge so it keeps mesh identity
+  // through mergeStatic and can be faded per willow. The bark skeleton
+  // stays opaque — a faded canopy reads as an ink outline of branches.
+  const canopy = new THREE.Mesh(mergeGeoms(curtainGeoms), leafMat);
+  canopy.name = cursed ? 'willow-canopy-cursed' : 'willow-canopy';
+  canopy.userData['occluder'] = true;
+  canopy.userData['noMerge'] = true;
+  group.add(canopy);
 
   // — cuttable branch clusters (the finale's three E-cuts) —
   const cuttableBranches: THREE.Mesh[] = [];

@@ -56,7 +56,7 @@ interface BranchFade {
 }
 
 const POOL_WISPS = 18;
-const POOL_SMOKE = 16;
+const POOL_SMOKE = 28; // dissolve fires 3 overlapping batches (M4 reveal)
 const POOL_EMBERS = 32;
 const POOL_DUST = 12;
 const POOL_RINGS = 4;
@@ -202,16 +202,27 @@ export class VfxSystem {
     }
   }
 
-  /** Ghost-dissolve smoke drawn upward (the reveal beat). */
+  /**
+   * Ghost-dissolve smoke drawn upward (the reveal beat, juice #13).
+   * M4: the puffs ride "one last gust" — strong upward pull with a hint
+   * of sideways drift, long-lived, eroding through the ghost shader's
+   * noise cutoff as they fade (bottom-first, so each puff tatters
+   * upward instead of blinking out).
+   */
   ghostSmokePuffs(pos: THREE.Vector3): void {
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 9; i++) {
       const p = this.take(this.smoke);
       if (!p) break;
-      p.vel.set((Math.random() - 0.5) * 0.6, 0.55 + Math.random() * 0.5, (Math.random() - 0.5) * 0.6);
-      p.life = 1.5;
-      p.scale0 = 1.0;
-      p.scale1 = 2.6;
-      this.arm(p, pos, 0.2 + Math.random() * 1.0);
+      const drift = 0.25 + Math.random() * 0.3; // last-gust sideways pull
+      p.vel.set(
+        (Math.random() - 0.5) * 0.5 + drift * 0.4,
+        0.85 + Math.random() * 0.9,
+        (Math.random() - 0.5) * 0.5 + drift * 0.4,
+      );
+      p.life = 1.6 + Math.random() * 0.6;
+      p.scale0 = 0.8 + Math.random() * 0.5;
+      p.scale1 = 2.4 + Math.random() * 0.8;
+      this.arm(p, pos, 0.15 + Math.random() * 1.1);
     }
   }
 

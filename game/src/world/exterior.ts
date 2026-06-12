@@ -74,6 +74,22 @@ export interface ExteriorBuild extends ExteriorBuildResult {
 
 const v3 = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z);
 
+/**
+ * Tag a tree's canopy for the M4 occluder fade (gameplay/occluderFade.ts).
+ * makeTree builds [trunk, canopy]; noMerge keeps the canopy's identity
+ * through mergeStatic (+1 draw per tagged tree — used sparingly, only on
+ * crowns that can sit between the SE camera and a path).
+ */
+function tagCanopyOccluder(tree: THREE.Group): THREE.Group {
+  const canopy = tree.children[1] as THREE.Mesh | undefined;
+  if (canopy && canopy.isMesh) {
+    canopy.name = 'tree-canopy';
+    canopy.userData['occluder'] = true;
+    canopy.userData['noMerge'] = true;
+  }
+  return tree;
+}
+
 export function buildExterior(kit: MaterialKit): ExteriorBuild {
   const group = new THREE.Group();
   group.name = 'exterior';
@@ -263,7 +279,7 @@ export function buildExterior(kit: MaterialKit): ExteriorBuild {
   for (const [tx, tz, th] of fieldTreeSpots) {
     const tree = makeTree(kit, th);
     tree.position.set(tx, 0, tz);
-    dressing.add(tree);
+    dressing.add(tagCanopyOccluder(tree)); // singles overhang walk paths
   }
 
   // ─────────────────────────────────────────────── grass dressing ──

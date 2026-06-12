@@ -38,6 +38,8 @@ import { InteractionSystem } from '@/gameplay/interactions';
 import { TriggerSystem } from '@/gameplay/triggers';
 import { SceneDirector } from '@/gameplay/sceneDirector';
 import { WindSystem } from '@/gameplay/wind';
+import { PapersSystem } from '@/gameplay/papers';
+import { OccluderFade } from '@/gameplay/occluderFade';
 import { QuestScript } from '@/gameplay/questScript';
 import type { ColliderShape, MotionState } from '@/core/types';
 
@@ -201,6 +203,16 @@ const triggers = new TriggerSystem({
   isActive: () => director.canPlayerAct() && !sceneDir.isSwapping(),
 });
 
+// Paper flutter sim (interior diary sheets + loose leaves at the willow
+// shore) and the canopy occluder fade (DESIGN §4 — finale readability).
+const papers = new PapersSystem({
+  papers: interior.papers,
+  kit,
+  exteriorGroup: exterior.group,
+});
+const occluderFade = new OccluderFade();
+occluderFade.collect(exterior.group);
+
 // ───────────────────────────────── transform-burst hook (DESIGN §2) ──
 let timeDipRemaining = 0;
 const TIME_DIP_SEC = 0.1;
@@ -219,15 +231,25 @@ avatar.onSwapVisual = (phase, worldPos, toForm) => {
 };
 
 // ───────────────────────────────────────────────── event wiring ──
+// Track the hint main owns so GustEnd can't wipe a tutorial glyph that
+// the quest script put up (the brace glyph is the only one main clears).
+let mainHint: string | null = null;
+function setMainHint(key: string | null): void {
+  mainHint = key;
+  hud.setHint(key);
+}
+
 bus.on('FormChanged', (form) => {
   flagStore.flags.currentForm = form;
 });
 bus.on('Knockdown', () => {
-  hud.setHint('hint.wiggleFree');
+  setMainHint('hint.wiggleFree');
   isoCam.shake(0.25, 0.4);
   audio.playSfx('knockdown');
 });
-bus.on('KnockdownRecovered', () => hud.setHint(null));
+bus.on('KnockdownRecovered', () => {
+  if (mainHint === 'hint.wiggleFree') setMainHint(null);
+});
 bus.on('Footstep', (surface) =>
   audio.playSfx(surface === 'wood' ? 'footstepWood' : 'footstepGrass'),
 );
@@ -248,11 +270,13 @@ bus.on('DialogBlip', () => audio.playSfx('dialogBlip'));
 // questScript owns the real tutorial beats).
 bus.on('GustStart', (phase) => {
   if (phase === 'lash' && player.form === 'human' && sceneDir.active === 'exterior') {
-    hud.setHint('hint.brace');
+    setMainHint('hint.brace');
   }
 });
 bus.on('GustEnd', () => {
-  if (!player.isKnockedDown()) hud.setHint(null);
+  // Only clear what main itself put up — a gust cycling while the move/
+  // transform glyph shows must not eat the tutorial beat.
+  if (!player.isKnockedDown() && mainHint === 'hint.brace') setMainHint(null);
 });
 
 // Self-talk bubble projector: track the player's head on screen.
@@ -288,6 +312,7 @@ const questScript = new QuestScript({
   exterior,
   interior,
   yanagi,
+  papers,
   getFlags: () => flagStore.flags,
 });
 
@@ -344,10 +369,29 @@ loop.add((rawDt) => {
     yanagi.setWindSway(wind.state.strength);
     yanagi.update(dt, yanagiMotion);
     extRig.flicker(dt, wind.state.strength);
+    // occluder fade: canopies between the SE camera and the player thin
+    // to ~15 % (DESIGN §4 — the finale approach must read)
+    occluderFade.update(dt, player.pos);
   } else {
     intRig.flicker(dt);
   }
+  papers.update(dt, wind.state, sceneDir.active);
   vfx.update(dt);
+
+  // gust-lash micro-rumble (juice #8): the screen trembles while branch
+  // whips crack near the player — proximity-scaled, sin-based, no decay.
+  let rumble = 0;
+  if (sceneDir.active === 'exterior' && wind.state.phase === 'lash') {
+    for (const zone of exterior.lashZones) {
+      const dzx = player.pos.x - zone.center.x;
+      const dzz = player.pos.z - zone.center.z;
+      const dist = Math.hypot(dzx, dzz);
+      const f = 1 - dist / (zone.radius * 2.2);
+      if (f > rumble) rumble = f;
+    }
+    rumble = 0.055 * rumble * rumble * wind.state.strength;
+  }
+  isoCam.setRumble(rumble);
 
   // camera: diorama drift on title/intro, follow in play.
   // The moon shadow frustum tracks whatever the camera looks at.
@@ -434,6 +478,8 @@ if (import.meta.env.DEV) {
     triggers,
     input,
     bus,
+    papers,
+    occluderFade,
     getFlags: () => flagStore.flags,
   };
 }

@@ -23,6 +23,11 @@
  * setEnabled(false) pauses gusts (interior — DESIGN §3: no gust cycle in
  * the cottage); a gust in flight is cancelled back to calm.
  * stopForever() eases strength to 0 and never gusts again (the finale).
+ *
+ * M4: after stopForever() the shared shader CLOCK also winds down to a
+ * halt (~3 s ease) — the sway shader keeps a small idle breath even at
+ * strength 0 and the water keeps scrolling, so freezing uTime is what
+ * actually delivers DESIGN §5 "willows dead still, lake to glass".
  */
 import * as THREE from 'three';
 import type { GustPhase, LashZone, WindState, WindUniforms } from '@/core/types';
@@ -58,7 +63,8 @@ function mulberry32(seed: number): () => number {
 /** The minimal player surface the hazard check needs. */
 export interface WindKnockdownTarget {
   pos: THREE.Vector3;
-  applyKnockdown(pushDir: THREE.Vector2): void;
+  /** Returns true when the knockdown actually landed (not braced/graced). */
+  applyKnockdown(pushDir: THREE.Vector2): boolean;
 }
 
 export class WindSystem {
@@ -77,6 +83,8 @@ export class WindSystem {
   private phaseDur: number;
   private enabled = true;
   private stoppedForever = false;
+  /** Shader-clock rate; winds down to 0 after stopForever (dead still). */
+  private timeScale = 1;
 
   private baseAngle = Math.atan2(BASE_DIR.y, BASE_DIR.x);
   private dirAngle = this.baseAngle;
@@ -84,6 +92,13 @@ export class WindSystem {
   private lashZones: readonly LashZone[] = [];
   private player: WindKnockdownTarget | null = null;
   private readonly pushTmp = new THREE.Vector2();
+  /**
+   * M4 fairness rule: the branch whip catches you at most ONCE per lash —
+   * a player who recovers inside the zone gets to escape instead of being
+   * knock-locked until the gust ends. Only a LANDED knockdown arms it, so
+   * dropping a brace mid-lash is still punishable.
+   */
+  private knockedThisGust = false;
 
   constructor(bus: EventBus, seed = 0x9e3779b9) {
     this.bus = bus;
@@ -156,15 +171,19 @@ export class WindSystem {
   // ── per-frame ──
 
   update(dt: number): void {
-    this.state.time += dt;
-
     if (this.stoppedForever) {
-      // Ease the world to glass (≈1.5 s) and stay there.
-      this.state.strength += (0 - this.state.strength) * (1 - Math.exp(-dt * 2.5));
+      // The dying breath: strength drains in ~1 s, then the shader clock
+      // itself slows to a stop (~3 s) — sway/water freeze, world to glass.
+      this.timeScale += (0 - this.timeScale) * (1 - Math.exp(-dt * 1.1));
+      if (this.timeScale < 0.01) this.timeScale = 0;
+      this.state.time += dt * this.timeScale;
+      this.state.strength += (0 - this.state.strength) * (1 - Math.exp(-dt * 3.2));
       if (this.state.strength < 0.005) this.state.strength = 0;
       this.syncUniforms();
       return;
     }
+
+    this.state.time += dt;
 
     if (this.enabled) {
       this.phaseT += dt;
@@ -192,8 +211,8 @@ export class WindSystem {
     }
     this.state.strength += (target - this.state.strength) * (1 - Math.exp(-dt * rate));
 
-    // Hazard: lash-zone branch whips knock either form down.
-    if (this.state.phase === 'lash' && this.player) {
+    // Hazard: lash-zone branch whips knock either form down (once per gust).
+    if (this.state.phase === 'lash' && this.player && !this.knockedThisGust) {
       const p = this.player.pos;
       for (let i = 0; i < this.lashZones.length; i += 1) {
         const zone = this.lashZones[i];
@@ -204,7 +223,7 @@ export class WindSystem {
           const len = Math.sqrt(dx * dx + dz * dz);
           if (len > 1e-4) this.pushTmp.set(dx / len, dz / len);
           else this.pushTmp.set(-this.state.direction.x, -this.state.direction.y);
-          this.player.applyKnockdown(this.pushTmp);
+          if (this.player.applyKnockdown(this.pushTmp)) this.knockedThisGust = true;
           break;
         }
       }
@@ -226,6 +245,7 @@ export class WindSystem {
         break;
       case 'telegraph':
         this.setPhase('lash', LASH_SEC);
+        this.knockedThisGust = false; // the whip is re-armed for this lash
         this.bus.emit('GustStart', 'lash' satisfies GustPhase);
         break;
       case 'lash':

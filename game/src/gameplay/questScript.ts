@@ -57,6 +57,8 @@ import type { Yanagi } from '@/characters/yanagi';
 import type { ExteriorBuild } from '@/world/exterior';
 import type { InteriorBuild } from '@/world/interior';
 import type { ScreensHandle } from '@/ui/screens';
+import type { PapersSystem } from '@/gameplay/papers';
+import { VIEW_HEIGHT_EXTERIOR } from '@/engine/camera';
 import { DialogRoot } from '@/data/dialogs';
 import { createWisps, type WispsBuild } from '@/world/props/wisps';
 import { t } from '@/i18n';
@@ -66,16 +68,20 @@ const MASK_BURST_AT = 0.4;
 const MASK_TRANSFORM_AT = 1.4;
 const MASK_WHISPER_AT = 2.2;
 const MASK_UNLOCK_AT = 3.0;
-const LEAP_SEC = 0.6; // window-leap arc duration
-const LEAP_HEIGHT = 1.35;
+const LEAP_SEC = 0.7; // window-leap arc (TECH_SPEC §5: readable, snappy 0.7 s)
+const LEAP_HEIGHT = 1.55; // clears the y 1.4 crate stack with visible air
 const LEAP_SWAP_AT = 0.45; // fraction of the arc where the fade-swap fires
 const SCARE_DELAY_SEC = 1.5;
 const CUT_LOCK_SEC = 0.55;
+const BOW_BREATH_SEC = 0.45; // bow finished → a held breath → the unravel
 const DISSOLVE_SEC = 3.0;
-const QUIET_HOLD_SEC = 2.0;
+const QUIET_HOLD_SEC = 3.0; // wind drains ~1 s of this; ≥2 s of TRUE silence
 const ENDING_HOLD_SEC = 1.5;
 const SUPPRESS_CLEAR_DIST = 4.5; // walk this far away to re-offer Dialog 1
-const PAPER_GRAVITY = 5.0;
+// reveal dolly (juice #8): ~8 % tighten while approaching the body marker
+const DOLLY_VIEW_HEIGHT = 12.9;
+const DOLLY_IN_DIST = 5.5;
+const DOLLY_OUT_DIST = 8;
 
 interface Timer {
   t: number;
@@ -86,16 +92,6 @@ interface LeapState {
   t: number;
   dir: 'in' | 'out';
   swapped: boolean;
-}
-
-interface PaperAnim {
-  mesh: THREE.Mesh;
-  baseY: number;
-  vx: number;
-  vy: number;
-  vz: number;
-  spin: number;
-  t: number;
 }
 
 export interface QuestScriptOptions {
@@ -118,6 +114,8 @@ export interface QuestScriptOptions {
   exterior: ExteriorBuild;
   interior: InteriorBuild;
   yanagi: Yanagi;
+  /** The paper flutter sim (gameplay/papers.ts) — the scare slams it. */
+  papers: PapersSystem;
   /** Live flags accessor — restart swaps the flags object. */
   getFlags: () => GameFlags;
 }
@@ -140,7 +138,7 @@ export class QuestScript {
   private drawerOpened = false;
   private scareArmed = false;
   private scareDone = false;
-  private paperAnims: PaperAnim[] = [];
+  private firstGustFired = false;
 
   // dialog auto-trigger suppression (refusal → walk away to re-offer)
   private dlg1Suppressed = false;
@@ -151,6 +149,7 @@ export class QuestScript {
   private dissolveT = -1; // <0 idle; 0.. running; done when ghostDissolved
   private dissolvePuffs = 0;
   private fearShownThisGust = false;
+  private dollyTight = false; // body-reveal camera tighten latch
 
   // guide kitsunebi
   private readonly guideHomes: THREE.Vector3[];
@@ -207,11 +206,11 @@ export class QuestScript {
     this.busyT = Math.max(0, this.busyT - dt);
 
     this.updateLeap(dt);
-    this.updatePapers(dt);
     this.updateDissolve(dt);
     this.updateTutorialHints();
     this.updateSuppression();
     this.updateFearWhisper();
+    this.updateRevealDolly();
     this.updateGuides(dt);
   }
 
@@ -269,14 +268,30 @@ export class QuestScript {
 
     // — scripted first gust: first steps into the open field past the
     //   gate fire one immediate telegraph+lash cycle (main's GustStart
-    //   handler shows the brace glyph if the human gets staggered) —
+    //   handler shows the brace glyph if the human gets staggered).
+    //   Two volumes cover BOTH routes north (gate path + reed tunnel),
+    //   wide enough that skirting the field edge still trips one —
+    //   whichever fires first wins (DESIGN §8 ~60 s beat). —
+    const fireFirstGust = (): void => {
+      if (this.firstGustFired) return;
+      this.firstGustFired = true;
+      o.wind.triggerGustNow();
+    };
     o.triggers.register({
       id: 'q-first-gust',
-      position: new THREE.Vector3(-16, 0, -5),
+      position: new THREE.Vector3(-15, 0, -4.5),
+      radius: 8,
+      once: true,
+      enabled: () => outside() && this.gateOpened && !this.firstGustFired,
+      onEnter: fireFirstGust,
+    });
+    o.triggers.register({
+      id: 'q-first-gust-shore',
+      position: new THREE.Vector3(7, 0, -3),
       radius: 6,
       once: true,
-      enabled: () => outside() && this.gateOpened,
-      onEnter: () => o.wind.triggerGustNow(),
+      enabled: () => outside() && !this.firstGustFired,
+      onEnter: fireFirstGust,
     });
   }
 
@@ -661,55 +676,25 @@ export class QuestScript {
     });
   }
 
-  /** Dialog 4, the shutter-slam scare (canon: auto after the futon line). */
+  /**
+   * Dialog 4, the shutter-slam scare (canon: auto after the futon line).
+   * Punch-up (M4): the slam SFX rides the GustStart event (M3 audio), the
+   * shake is a real thump, and the papers explode away from the EAST
+   * window through the flutter sim (lift → tumble → glide-settle).
+   */
   private runScare(): void {
     const o = this.o;
     if (this.scareDone) return;
     this.scareDone = true;
     if (o.sceneDir.active !== 'interior') return; // fled before it landed
 
-    o.bus.emit('GustStart', 'lash'); // Gust-ish event for M3 audio (no cycle)
+    o.bus.emit('GustStart', 'lash'); // audio plays the shutter-slam one-shot
     o.audio.playSfx('paperRustle');
-    o.isoCam.shake(0.22, 0.3);
-    this.tossPapers();
+    o.isoCam.shake(0.32, 0.4);
+    o.papers.slam(-0.9, 0.25); // blast INTO the room from the east window
     o.screens.showBubble('dlg.m.scare1', 1.3);
     this.schedule(1.2, () => o.bus.emit('GustEnd'));
     this.schedule(1.4, () => o.screens.showBubble('dlg.m.scare2', 3.5));
-  }
-
-  /** Papers explode upward, tumble and settle (DESIGN §4 interior beat). */
-  private tossPapers(): void {
-    this.paperAnims = [];
-    for (const mesh of this.o.interior.papers) {
-      this.paperAnims.push({
-        mesh,
-        baseY: mesh.position.y,
-        vx: (Math.random() - 0.5) * 0.6,
-        vy: 1.4 + Math.random() * 1.0,
-        vz: (Math.random() - 0.5) * 0.6,
-        spin: (Math.random() - 0.5) * 5,
-        t: 0,
-      });
-    }
-  }
-
-  private updatePapers(dt: number): void {
-    if (this.paperAnims.length === 0) return;
-    for (let i = this.paperAnims.length - 1; i >= 0; i -= 1) {
-      const p = this.paperAnims[i];
-      if (!p) continue;
-      p.t += dt;
-      const y = p.baseY + p.vy * p.t - 0.5 * PAPER_GRAVITY * p.t * p.t;
-      if (y <= p.baseY && p.t > 0.2) {
-        p.mesh.position.y = p.baseY; // settled (keeps the drifted XZ)
-        this.paperAnims.splice(i, 1);
-        continue;
-      }
-      p.mesh.position.y = y;
-      p.mesh.position.x += p.vx * dt;
-      p.mesh.position.z += p.vz * dt;
-      p.mesh.rotation.y += p.spin * dt;
-    }
   }
 
   // ────────────────── finale: branch cuts → dissolve → body reveal ──
@@ -791,10 +776,12 @@ export class QuestScript {
     o.director.setPhase('cutscene');
     o.bus.emit('CutsceneStart', 'dissolve');
     o.yanagi.standAndBow(() => {
-      // Rise–bow–rise done (~3.6 s) → unravel into white smoke.
-      this.dissolveT = 0;
-      this.dissolvePuffs = 0;
-      o.audio.playSfx('ghostDissolved');
+      // Rise–bow–rise done (~3.6 s) → a held breath → the unravel.
+      this.schedule(BOW_BREATH_SEC, () => {
+        this.dissolveT = 0;
+        this.dissolvePuffs = 0;
+        o.audio.playSfx('ghostDissolved');
+      });
     });
   }
 
@@ -903,6 +890,39 @@ export class QuestScript {
   }
 
   // ───────────────────────────────────────── connective tissue ──
+
+  /**
+   * Reveal dolly (juice #8 / DESIGN §5 "approach → slow dolly-tighten"):
+   * once the marker wisp burns at the willow roots, walking toward the
+   * body mound eases the frustum in ~8 %; walking away releases it.
+   * Latched with hysteresis so the camera never breathes at the border.
+   */
+  private updateRevealDolly(): void {
+    const o = this.o;
+    const flags = o.getFlags();
+    const eligible =
+      flags.ghostDissolved && !flags.bodyExamined && o.sceneDir.active === 'exterior';
+    if (!eligible) {
+      if (this.dollyTight && !flags.bodyExamined) {
+        // left the beat some other way (window exit can't happen here,
+        // but a restartless future path might) — release.
+        this.dollyTight = false;
+        o.isoCam.setViewHeight(VIEW_HEIGHT_EXTERIOR, 1.2);
+      }
+      return;
+    }
+    const mound = o.exterior.anchors.bodyMound;
+    const dx = o.player.pos.x - mound.x;
+    const dz = o.player.pos.z - mound.z;
+    const d2 = dx * dx + dz * dz;
+    if (!this.dollyTight && d2 < DOLLY_IN_DIST * DOLLY_IN_DIST) {
+      this.dollyTight = true;
+      o.isoCam.setViewHeight(DOLLY_VIEW_HEIGHT, 2.6); // the slow lean-in
+    } else if (this.dollyTight && d2 > DOLLY_OUT_DIST * DOLLY_OUT_DIST) {
+      this.dollyTight = false;
+      o.isoCam.setViewHeight(VIEW_HEIGHT_EXTERIOR, 1.4);
+    }
+  }
 
   /** Her hushed line when bracing beside her through a lash (DESIGN §3). */
   private updateFearWhisper(): void {

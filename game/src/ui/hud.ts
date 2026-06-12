@@ -38,13 +38,32 @@ const PAW_BLOCKED_SVG = `
     <line class="ke-glyph-cross" x1="3" y1="21" x2="21" y2="3"/>
   </svg>`;
 
+/** The husband's tantō — the "quiet dagger icon" (DESIGN §9). */
+const DAGGER_SVG = `
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path class="ke-glyph-fill" d="M4.2 19.8 L13.6 8.6 C14.8 7.2 16.2 6.2 17.4 5.8 L18.2 6.6 C17.8 7.8 16.8 9.2 15.4 10.4 L4.2 19.8 Z"/>
+    <rect class="ke-glyph-fill" x="16.1" y="3.4" width="4.4" height="1.7" rx="0.8" transform="rotate(45 18.3 4.2)"/>
+    <rect class="ke-glyph-fill" x="18" y="5.8" width="3.4" height="1.3" rx="0.6" transform="rotate(45 19.7 6.4)"/>
+  </svg>`;
+
+/**
+ * Objective keys during which the dagger sits in the mask (hasDagger is
+ * true exactly from quest step 4 on) — the HUD shows the quiet icon by
+ * the objective line without needing event wiring (key inference).
+ */
+const DAGGER_OBJECTIVE_KEYS = new Set([
+  'quest.obj4.title',
+  'quest.obj5.title',
+  'quest.obj6.title',
+]);
+
 export function createHud(layer: HTMLElement): IHud {
   layer.classList.add('ke-hud');
   layer.innerHTML = `
     <div class="ke-banner" style="display:none">
       <div class="ke-banner-stroke"></div>
       <div class="ke-banner-text">
-        <div class="ke-banner-title"></div>
+        <div class="ke-banner-title"><span class="ke-banner-title-text"></span><span class="ke-banner-dagger" title="">${DAGGER_SVG}</span></div>
         <div class="ke-banner-hint"></div>
       </div>
     </div>
@@ -66,7 +85,8 @@ export function createHud(layer: HTMLElement): IHud {
   `;
 
   const banner = layer.querySelector<HTMLElement>('.ke-banner')!;
-  const bannerTitle = layer.querySelector<HTMLElement>('.ke-banner-title')!;
+  const bannerTitle = layer.querySelector<HTMLElement>('.ke-banner-title-text')!;
+  const bannerDagger = layer.querySelector<HTMLElement>('.ke-banner-dagger')!;
   const bannerHint = layer.querySelector<HTMLElement>('.ke-banner-hint')!;
   const prompt = layer.querySelector<HTMLElement>('.ke-prompt')!;
   const promptText = layer.querySelector<HTMLElement>('.ke-prompt-text')!;
@@ -89,6 +109,11 @@ export function createHud(layer: HTMLElement): IHud {
     bannerTitle.textContent = objectiveTitleKey ? t(objectiveTitleKey) : '';
     bannerHint.textContent = objectiveHintKey ? t(objectiveHintKey) : '';
     bannerHint.style.display = objectiveHintKey ? '' : 'none';
+    // The quiet dagger icon (DESIGN §9): she carries the husband's tantō
+    // exactly while objectives 4–6 are up — inferred from the key, no
+    // event wiring needed.
+    bannerDagger.style.display =
+      objectiveTitleKey && DAGGER_OBJECTIVE_KEYS.has(objectiveTitleKey) ? '' : 'none';
 
     prompt.style.display = promptKey ? '' : 'none';
     promptText.textContent = promptKey ? t(promptKey) : '';

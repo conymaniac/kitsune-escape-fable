@@ -31,6 +31,7 @@
  */
 import * as THREE from 'three';
 import type { MaterialKit, MotionState } from '@/core/types';
+import { setGhostDissolve } from '@/style/shaders/ghost';
 import { col, colMix, fuse, lathe, remapUvY, xf } from './geo';
 import { CharacterBase, clamp01, lerp, limbPivot, meshIn, namedGroup, smoothstep01 } from './rig';
 
@@ -193,13 +194,22 @@ export class Yanagi extends CharacterBase {
 
   // ── final public APIs ──
 
-  /** 0 = fully present, 1 = fully unravelled. M1: opacity fade + rise. */
+  /**
+   * 0 = fully present, 1 = fully unravelled.
+   * M4: erosion-led — the ghost shader's noise-threshold cutoff tatters
+   * her bottom-up (bright violet edge band) while body opacity holds
+   * until the last scraps; she erodes into smoke instead of cross-fading.
+   * Falls back to the M1 opacity fade on non-shader stub kits.
+   */
   setDissolve(t: number): void {
     this.dissolve = clamp01(t);
     for (let i = 0; i < this.ghostMats.length; i++) {
       const mat = this.ghostMats[i];
       const base = this.baseOpacities[i];
-      if (mat && base !== undefined) mat.opacity = base * (1 - this.dissolve);
+      if (!mat || base === undefined) continue;
+      if (!setGhostDissolve(mat, this.dissolve)) {
+        mat.opacity = base * (1 - this.dissolve);
+      }
     }
     this.root.visible = this.dissolve < 1;
   }
@@ -250,9 +260,11 @@ export class Yanagi extends CharacterBase {
       }
     }
 
-    // — hovering: slow Y sine, rises slightly when standing + dissolving —
+    // — hovering: slow Y sine, rises when standing; the dissolve draws
+    //   her upward with an ease-in (the "one last gust" pulling her up) —
+    const drawUp = this.dissolve * this.dissolve * 0.85;
     const hoverBase = lerp(HOVER_BASE, STAND_HOVER_BASE, rise);
-    this.hover.position.y = hoverBase + Math.sin(this.time * 0.8) * 0.05 + this.dissolve * 0.45;
+    this.hover.position.y = hoverBase + Math.sin(this.time * 0.8) * 0.05 + drawUp;
 
     // — wind sway: gentle lean + drift, amplitude tied to wind strength —
     const sway = 0.25 + this.windSway * 0.75;

@@ -19,6 +19,13 @@ import type { EventBus } from '@/core/events';
 
 const CHARS_PER_SECOND = 35;
 const BLIP_EVERY_N_CHARS = 3;
+// Storybook pacing (M4 juice #3): the typewriter breathes at punctuation.
+const SENTENCE_PAUSE_MS = 260; // after . ! ? …
+const CLAUSE_PAUSE_MS = 120; // after , ; : — –
+const SENTENCE_GLYPHS = '.!?…';
+const CLAUSE_GLYPHS = ',;:—–';
+/** Glyphs that never blip (silence at the breath points). */
+const QUIET_GLYPHS = ' .!?…,;:—–"\'';
 
 /** Extra hooks beyond the frozen IDialogUi contract. */
 export interface DialogUiExtras {
@@ -103,9 +110,27 @@ export function createDialogUi(layer: HTMLElement, bus: EventBus): DialogUiHandl
 
   function stopTyping(): void {
     if (typingTimer !== null) {
-      clearInterval(typingTimer);
+      clearTimeout(typingTimer);
       typingTimer = null;
     }
+  }
+
+  /** Type one glyph, blip on the beat, breathe at punctuation. */
+  function typeNextChar(): void {
+    shownChars += 1;
+    textEl.textContent = fullText.slice(0, shownChars);
+    const glyph = fullText[shownChars - 1] ?? '';
+    if (shownChars % BLIP_EVERY_N_CHARS === 0 && glyph && !QUIET_GLYPHS.includes(glyph)) {
+      bus.emit('DialogBlip');
+    }
+    if (shownChars >= fullText.length) {
+      finishLine();
+      return;
+    }
+    let delay = 1000 / CHARS_PER_SECOND;
+    if (SENTENCE_GLYPHS.includes(glyph)) delay = SENTENCE_PAUSE_MS;
+    else if (CLAUSE_GLYPHS.includes(glyph)) delay = CLAUSE_PAUSE_MS;
+    typingTimer = window.setTimeout(typeNextChar, delay);
   }
 
   function finishLine(): void {
@@ -224,15 +249,7 @@ export function createDialogUi(layer: HTMLElement, bus: EventBus): DialogUiHandl
         finishLine();
         return;
       }
-      typingTimer = window.setInterval(() => {
-        shownChars += 1;
-        textEl.textContent = fullText.slice(0, shownChars);
-        const glyph = fullText[shownChars - 1];
-        if (shownChars % BLIP_EVERY_N_CHARS === 0 && glyph !== ' ') {
-          bus.emit('DialogBlip');
-        }
-        if (shownChars >= fullText.length) finishLine();
-      }, 1000 / CHARS_PER_SECOND);
+      typingTimer = window.setTimeout(typeNextChar, 1000 / CHARS_PER_SECOND);
     },
     isTyping(): boolean {
       return typingTimer !== null;
@@ -247,6 +264,7 @@ export function createDialogUi(layer: HTMLElement, bus: EventBus): DialogUiHandl
       choicesEl.innerHTML = '';
       texts.forEach((text, i) => {
         const li = document.createElement('li');
+        li.style.animationDelay = `${i * 0.08}s`; // staggered brush-in
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'ke-choice';

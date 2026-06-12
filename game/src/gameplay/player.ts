@@ -14,7 +14,7 @@
  * - gust stagger: lash + human + outdoors + not bracing + not in a wind
  *   shadow → 40 % speed (DESIGN §3)
  * - knockdown via applyKnockdown(pushDir): tumble + ~3 m push, recover on
- *   3 E-presses or 2 s; 0.8 s post-recovery grace
+ *   3 E-presses or 2.6 s auto bail-out + 0.25 s snap-free; 0.8 s grace
  * - form switch on F (when director.canPlayerAct(), not mid-swap, not
  *   down): emits FormChanged at request time; the avatar's onSwapVisual
  *   hook (wired in main.ts) handles burst/time-dip/punch-zoom/input lock
@@ -50,11 +50,15 @@ const BOUND_TIME = 0.35;
 const BOUND_COOLDOWN = 0.6;
 const BOUND_ARC_HEIGHT = 0.85;
 
+// Knockdown cost target (DESIGN §3 + M4 feel pass): push 0.5 s + trapped
+// (3×E ≈ 1–1.5 s, auto bail-out 2.6 s) + 0.25 s snap-free ≈ 2.3–3.4 s down,
+// plus the ~3 m walk-back — the whole mistake costs ~3–5 s, never more.
 const KNOCK_PUSH_DIST = 3;
-const KNOCK_PUSH_TIME = 0.45;
+const KNOCK_PUSH_TIME = 0.5;
 const KNOCK_RECOVER_PRESSES = 3;
-const KNOCK_AUTO_RECOVER_SEC = 2;
+const KNOCK_AUTO_RECOVER_SEC = 2.6;
 const KNOCK_GRACE_SEC = 0.8;
+const KNOCK_SNAP_LOCK_SEC = 0.25;
 
 /** Footstep stride in metres (cadence syncs with the rigs' gait feel). */
 const STRIDE_HUMAN = 0.95;
@@ -198,9 +202,14 @@ export class PlayerController {
   /**
    * Wind/lash hazard entry: tumble + ~3 m push. Ignored while bracing
    * (DESIGN §3 finale: Brace beside her), already down, or in grace.
+   * Returns true when the knockdown landed (wind's once-per-gust rule).
    */
-  applyKnockdown(pushDir: THREE.Vector2): void {
-    if (this.state === 'knockdown' || this.knockGrace > 0 || this.bracing) return;
+  applyKnockdown(pushDir: THREE.Vector2): boolean {
+    if (this.state === 'knockdown' || this.knockGrace > 0 || this.bracing) return false;
+    // No tumbles while a dialog panel/cutscene owns the moment — the ghost
+    // stands inside the cursed lash zone, and being whipped down mid-
+    // conversation reads as a bug, not as weather (M4 feel pass).
+    if (!this.director.canPlayerAct()) return false;
     this.state = 'knockdown';
     this.bracing = false;
     this.boundT = 0;
@@ -214,6 +223,7 @@ export class PlayerController {
     this.avatar.setAction('knockdown');
     this.onDust?.(this.pos);
     this.bus.emit('Knockdown');
+    return true;
   }
 
   // ── per-frame ──
@@ -416,15 +426,19 @@ export class PlayerController {
       return;
     }
 
-    // Trapped: mash E (3×) or wait 2 s.
+    // Trapped: mash E (3×) or the auto bail-out frees you regardless.
     if (canAct && this.input.justPressed('interact')) this.knockPresses += 1;
     if (
       this.knockPresses >= KNOCK_RECOVER_PRESSES ||
       this.knockT - KNOCK_PUSH_TIME >= KNOCK_AUTO_RECOVER_SEC
     ) {
+      // Elastic snap-free (juice #14): a dust pop + a beat of stagger
+      // before control returns, so escaping reads as effortful.
       this.state = 'normal';
       this.knockGrace = KNOCK_GRACE_SEC;
+      this.controlLock = Math.max(this.controlLock, KNOCK_SNAP_LOCK_SEC);
       this.avatar.setAction('idle');
+      this.onDust?.(this.pos);
       this.bus.emit('KnockdownRecovered');
     }
   }

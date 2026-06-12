@@ -1,5 +1,16 @@
 /**
- * Screens — IScreens implementation (M1, Stream E).
+ * Screens — IScreens implementation (M1, Stream E; M4-P2 presentation).
+ *
+ * M4-P2 GRADE WIRING (style-side, no main.ts changes): screens owns the
+ * cinematic moments, so it drives style/postfx's setGlobalGrade():
+ *   · GhostDissolved arms the reveal → the NEXT paper overlay (the body
+ *     text, by quest order) tweens the world to the 'inkReveal' grade
+ *     (DESIGN §5 — desaturate to ink-and-bone except the violet kimono)
+ *   · showEnding eases 'inkReveal' → 'dawn' over the still-lake shot
+ *   · pause dims/desaturates the frozen world ('pauseDim' ↔ 'normal')
+ * M4-P2 also: intro hold-Esc-1s skip (DESIGN §6), ember petals, ending
+ * medallion ink-stamp slam + vermillion bloom (juice #16) + prose pacing
+ * over the live lake, pause volume hook (setAudioHooks extra).
  *
  * Title (calligraphy DOM over the live 3D diorama — transparent vignette
  * backdrop; EN/ČESKY select; press-any-key), Intro (6 ink-wash narration
@@ -19,6 +30,7 @@
  */
 import type { IScreens, Locale } from '@/core/types';
 import type { EventBus } from '@/core/events';
+import { setGlobalGrade } from '@/style/postfx';
 import { getLocale, onLocaleChange, setLocale, t } from '@/i18n';
 
 const INTRO_BEAT_KEYS = ['intro.1', 'intro.2', 'intro.3', 'intro.4', 'intro.5', 'intro.6'];
@@ -35,7 +47,11 @@ const ENDING_LINE_KEYS = [
   'end.10',
 ];
 const INTRO_AUTO_ADVANCE_SEC = 6;
-const ENDING_LINE_INTERVAL_SEC = 2.2;
+const INTRO_SKIP_HOLD_MS = 1000; // hold Esc 1 s to skip (DESIGN §6)
+const INTRO_EMBERS = 7; // drifting ember petals per beat panel
+const ENDING_STAMP_DELAY_MS = 700; // medallion ink-stamp lands first…
+const ENDING_FIRST_LINE_MS = 2400; // …then the prose starts…
+const ENDING_LINE_INTERVAL_SEC = 2.6; // …pacing slowly over the lake
 
 const CONTROL_KEYS = [
   'controls.move',
@@ -66,6 +82,11 @@ export interface WhisperOptions {
   violet?: boolean;
 }
 
+export interface ScreensAudioHooks {
+  /** Pause volume slider target (AudioHandle.setMasterVolume). */
+  setMasterVolume?: (volume01: number) => void;
+}
+
 export interface ScreensExtras {
   /** Channel 1: floating bone-white ambient text. No input, no pause. */
   showWhisper(textKey: string, screenAnchor?: ScreenPoint, opts?: WhisperOptions): void;
@@ -73,6 +94,8 @@ export interface ScreensExtras {
   showBubble(textKey: string, durationSec?: number): void;
   /** Integrator hook — world-space projection for the self-talk bubble. */
   setProjector(fn: ScreensProjector | null): void;
+  /** M4 integrator hook — wires the pause volume slider to the audio. */
+  setAudioHooks(hooks: ScreensAudioHooks): void;
 }
 
 export type ScreensHandle = IScreens & ScreensExtras;
@@ -186,12 +209,12 @@ export function createScreens(
   }
 
   function onTitleKey(e: KeyboardEvent): void {
-    // L stays a live locale toggle on the title screen.
-    if (e.code === 'KeyL') {
-      setLocale(getLocale() === 'en' ? 'cs' : 'en');
-      renderTitle();
-      return;
-    }
+    // L toggles locale, M toggles mute — both are handled by the global
+    // input loop (main.ts); the title only swallows them so they don't
+    // count as "press any key". (Toggling here too would double-flip —
+    // found in the M4 browser pass.) renderTitle re-runs via the
+    // onLocaleChange hook below.
+    if (e.code === 'KeyL' || e.code === 'KeyM') return;
     fireTitleStart();
   }
   function onTitleClick(e: MouseEvent): void {
@@ -217,9 +240,31 @@ export function createScreens(
   let introBeat = 0;
   let introOnDone: (() => void) | null = null;
   let introTimer: number | null = null;
+  // hold-Esc-1s skip state (DESIGN §6; M0 deviation note resolved here).
+  // Interval-driven (not rAF): keeps working under background-tab rAF
+  // throttling, and 50 ms steps are smooth enough for a 1 s meter.
+  let escHoldStart: number | null = null;
+  let escHoldTimer: number | null = null;
+  let skipEl: HTMLElement | null = null;
+
+  /** Drifting ember petals over the ink-wash panel (DESIGN §6 intro). */
+  function emberField(): HTMLElement {
+    const field = document.createElement('div');
+    field.className = 'ke-embers';
+    for (let i = 0; i < INTRO_EMBERS; i++) {
+      const ember = document.createElement('span');
+      ember.className = 'ke-ember';
+      ember.style.left = `${8 + Math.random() * 84}%`;
+      ember.style.animationDelay = `${Math.random() * 5}s`;
+      ember.style.animationDuration = `${7 + Math.random() * 6}s`;
+      field.appendChild(ember);
+    }
+    return field;
+  }
 
   function renderIntroBeat(): void {
     introEl.innerHTML = '';
+    introEl.appendChild(emberField());
     const panel = document.createElement('div');
     panel.className = 'ke-intro-panel';
     const beat = document.createElement('div');
@@ -231,7 +276,10 @@ export function createScreens(
     advance.textContent = `${introBeat + 1} / ${INTRO_BEAT_KEYS.length} · ${t('ui.pressAnyKey')}`;
     const skip = document.createElement('div');
     skip.className = 'ke-intro-skip';
-    skip.textContent = t('ui.intro.skip');
+    skip.innerHTML = `<span class="ke-skip-label"></span><span class="ke-skip-track"><span class="ke-skip-fill"></span></span>`;
+    const skipLabel = skip.querySelector<HTMLElement>('.ke-skip-label');
+    if (skipLabel) skipLabel.textContent = t('ui.intro.skip');
+    skipEl = skip;
     introEl.append(panel, advance, skip);
     if (introTimer !== null) clearTimeout(introTimer);
     introTimer = window.setTimeout(advanceIntro, INTRO_AUTO_ADVANCE_SEC * 1000);
@@ -250,23 +298,58 @@ export function createScreens(
     closeIntro();
     cb?.();
   }
+  function cancelEscHold(): void {
+    escHoldStart = null;
+    if (escHoldTimer !== null) {
+      clearInterval(escHoldTimer);
+      escHoldTimer = null;
+    }
+    skipEl?.classList.remove('is-holding');
+    skipEl?.style.removeProperty('--ke-skip');
+  }
+  function tickEscHold(): void {
+    if (!introOpen || escHoldStart === null) {
+      cancelEscHold();
+      return;
+    }
+    const held = performance.now() - escHoldStart;
+    const k = Math.min(held / INTRO_SKIP_HOLD_MS, 1);
+    // re-assert every tick: the auto-advance re-render mints a new skipEl
+    skipEl?.classList.add('is-holding');
+    skipEl?.style.setProperty('--ke-skip', String(k));
+    if (k >= 1) {
+      cancelEscHold();
+      finishIntro();
+    }
+  }
   function onIntroKey(e: KeyboardEvent): void {
     if (e.code === 'Escape') {
-      finishIntro(); // M1: Esc skips immediately (hold-to-skip is M4 polish)
+      // Hold Esc 1 s to skip — a tap does nothing but show the meter.
+      if (escHoldStart === null && !e.repeat) {
+        escHoldStart = performance.now();
+        skipEl?.classList.add('is-holding');
+        if (escHoldTimer === null) escHoldTimer = window.setInterval(tickEscHold, 50);
+      }
       return;
     }
     advanceIntro();
+  }
+  function onIntroKeyUp(e: KeyboardEvent): void {
+    if (e.code === 'Escape') cancelEscHold();
   }
   function closeIntro(): void {
     if (!introOpen) return;
     introOpen = false;
     introOnDone = null;
+    cancelEscHold();
+    skipEl = null;
     if (introTimer !== null) {
       clearTimeout(introTimer);
       introTimer = null;
     }
     introEl.classList.remove('is-open');
     window.removeEventListener('keydown', onIntroKey);
+    window.removeEventListener('keyup', onIntroKeyUp);
     introEl.removeEventListener('click', advanceIntro);
   }
 
@@ -275,19 +358,28 @@ export function createScreens(
   let endingOnRestart: (() => void) | null = null;
   let endingOnTitle: (() => void) | null = null;
   let endingRevealed = 0; // prose lines currently visible (survives re-render)
+  let endingStamped = false; // medallion has slammed (survives re-render)
   let endingTimer: number | null = null;
+  let endingStampTimer: number | null = null;
+  let endingFirstLineTimer: number | null = null;
   let endingLineEls: HTMLElement[] = [];
+  let endingCardEl: HTMLElement | null = null;
 
   function applyEndingReveal(): void {
     endingLineEls.forEach((el, i) => el.classList.toggle('is-shown', i < endingRevealed));
+    endingCardEl?.classList.toggle('is-stamped', endingStamped);
   }
   function renderEnding(): void {
     endingEl.innerHTML = '';
     const scroll = document.createElement('div');
     scroll.className = 'ke-ending-scroll';
 
+    // The medallion ceremony (juice #16): the card waits invisible, then
+    // SLAMS in like a hanko seal with a vermillion ink bloom behind it.
     const card = document.createElement('div');
     card.className = 'ke-medallion-card';
+    const bloom = document.createElement('div');
+    bloom.className = 'ke-medallion-bloom';
     const coin = document.createElement('div');
     coin.className = 'ke-medallion-coin';
     coin.innerHTML = MEDALLION_SVG;
@@ -300,7 +392,8 @@ export function createScreens(
     const lore = document.createElement('div');
     lore.className = 'ke-medallion-lore';
     lore.textContent = t('medallion.lore');
-    card.append(coin, award, name, lore);
+    card.append(bloom, coin, award, name, lore);
+    endingCardEl = card;
     scroll.appendChild(card);
 
     endingLineEls = [];
@@ -311,13 +404,13 @@ export function createScreens(
       scroll.appendChild(line);
       endingLineEls.push(line);
     }
-    applyEndingReveal();
 
     const hint = document.createElement('div');
     hint.className = 'ke-ending-hint';
     hint.textContent = t('ui.ending.restartHint');
     scroll.appendChild(hint);
     endingEl.appendChild(scroll);
+    applyEndingReveal();
   }
   function revealNextEndingLine(): void {
     if (endingRevealed >= ENDING_LINE_KEYS.length) {
@@ -342,7 +435,8 @@ export function createScreens(
       closeEnding();
       cb?.();
     } else {
-      // Any other key fast-forwards the prose reveal.
+      // Any other key fast-forwards the ceremony + prose reveal.
+      endingStamped = true;
       endingRevealed = ENDING_LINE_KEYS.length;
       applyEndingReveal();
     }
@@ -353,10 +447,20 @@ export function createScreens(
     endingOnRestart = null;
     endingOnTitle = null;
     endingRevealed = 0;
+    endingStamped = false;
     endingLineEls = [];
+    endingCardEl = null;
     if (endingTimer !== null) {
       clearInterval(endingTimer);
       endingTimer = null;
+    }
+    if (endingStampTimer !== null) {
+      clearTimeout(endingStampTimer);
+      endingStampTimer = null;
+    }
+    if (endingFirstLineTimer !== null) {
+      clearTimeout(endingFirstLineTimer);
+      endingFirstLineTimer = null;
     }
     endingEl.classList.remove('is-open');
     window.removeEventListener('keydown', onEndingKey);
@@ -366,7 +470,8 @@ export function createScreens(
   let pauseOpen = false;
   let pauseOnResume: (() => void) | null = null;
   let pauseOnRestart: (() => void) | null = null;
-  let pauseVolume = 80; // visual placeholder until audio (M3) wires in
+  let pauseVolume = 80;
+  let audioHooks: ScreensAudioHooks = {}; // wired via setAudioHooks (M4)
 
   function renderPause(): void {
     pauseEl.innerHTML = '';
@@ -403,7 +508,8 @@ export function createScreens(
     });
     restartRow.appendChild(restartBtn);
 
-    // Volume placeholder slider — value persists, wiring arrives with M3.
+    // Volume slider — drives the master bus when the audio hook is wired
+    // (setAudioHooks extra; value persists in-session either way).
     const volumeRow = document.createElement('div');
     volumeRow.className = 'ke-pause-row ke-volume-row';
     const volumeLabel = document.createElement('span');
@@ -417,6 +523,7 @@ export function createScreens(
     slider.className = 'ke-volume-slider';
     slider.addEventListener('input', () => {
       pauseVolume = Number(slider.value);
+      audioHooks.setMasterVolume?.(pauseVolume / 100);
     });
     volumeRow.append(volumeLabel, slider);
 
@@ -437,11 +544,22 @@ export function createScreens(
     pauseOnRestart = null;
     pauseEl.classList.remove('is-open');
     window.removeEventListener('keydown', onPauseKey);
+    // Pause is only reachable during normal play — restore the play grade.
+    setGlobalGrade('normal', 0.45);
   }
 
   // ── paper overlay ──
   let paperOpen = false;
   let paperOnClose: (() => void) | null = null;
+
+  // M4-P2 reveal grade arming (DESIGN §5 "the reveal must land"): after
+  // the ghost dissolves, the next paper overlay IS the body reveal — it
+  // opens over a held shot, so the world desaturates to ink-and-bone
+  // (except the violet kimono) and the overlay backdrop stays see-through.
+  let inkRevealArmed = false;
+  bus.on('GhostDissolved', () => {
+    inkRevealArmed = true;
+  });
 
   function onPaperKey(e: KeyboardEvent): void {
     if (e.code === 'KeyE' || e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space') {
@@ -545,6 +663,7 @@ export function createScreens(
         setTimeout(() => {
           if (!introOpen) return;
           window.addEventListener('keydown', onIntroKey);
+          window.addEventListener('keyup', onIntroKeyUp);
           introEl.addEventListener('click', advanceIntro);
         }, 50);
       }
@@ -558,14 +677,27 @@ export function createScreens(
       if (!endingOpen) {
         endingOpen = true;
         endingRevealed = 0;
+        endingStamped = false;
         renderEnding();
         endingEl.classList.add('is-open');
         window.addEventListener('keydown', onEndingKey);
-        revealNextEndingLine(); // first line right away…
-        endingTimer = window.setInterval(
-          revealNextEndingLine,
-          ENDING_LINE_INTERVAL_SEC * 1000, // …then one every couple seconds
-        );
+        // The world behind eases from the ink reveal into the first
+        // grey-blue hint of dawn over the still lake (DESIGN §6).
+        setGlobalGrade('dawn', 7);
+        // Ceremony pacing: stamp slam → beat → prose, line by line.
+        endingStampTimer = window.setTimeout(() => {
+          endingStampTimer = null;
+          endingStamped = true;
+          applyEndingReveal();
+        }, ENDING_STAMP_DELAY_MS);
+        endingFirstLineTimer = window.setTimeout(() => {
+          endingFirstLineTimer = null;
+          revealNextEndingLine();
+          endingTimer = window.setInterval(
+            revealNextEndingLine,
+            ENDING_LINE_INTERVAL_SEC * 1000,
+          );
+        }, ENDING_FIRST_LINE_MS);
       }
     },
     hideEnding(): void {
@@ -578,6 +710,9 @@ export function createScreens(
         pauseOpen = true;
         renderPause();
         pauseEl.classList.add('is-open');
+        // DESIGN §6: the frozen world desaturates behind the scroll.
+        // (The render keeps running while paused; only updates freeze.)
+        setGlobalGrade('pauseDim', 0.3);
         setTimeout(() => {
           if (!pauseOpen) return;
           window.addEventListener('keydown', onPauseKey);
@@ -603,6 +738,7 @@ export function createScreens(
     showPaper(titleText: string, lines: string[], onClose?: () => void): void {
       paperOnClose = onClose ?? null;
       paperLayer.innerHTML = '';
+      paperLayer.classList.toggle('is-reveal', inkRevealArmed);
       const sheet = document.createElement('div');
       sheet.className = 'ke-paper-sheet';
       const title = document.createElement('div');
@@ -612,13 +748,13 @@ export function createScreens(
       lines.forEach((line, i) => {
         const p = document.createElement('div');
         p.className = 'ke-paper-line';
-        p.style.animationDelay = `${0.4 + i * 0.9}s`; // line-by-line ink reveal
+        p.style.animationDelay = `${0.45 + i * 1.05}s`; // line-by-line ink-draw
         p.textContent = line;
         sheet.appendChild(p);
       });
       const close = document.createElement('div');
       close.className = 'ke-paper-close';
-      close.style.animationDelay = `${0.6 + lines.length * 0.9}s`;
+      close.style.animationDelay = `${0.7 + lines.length * 1.05}s`;
       close.textContent = t('paper.closeHint');
       sheet.appendChild(close);
       paperLayer.appendChild(sheet);
@@ -627,6 +763,8 @@ export function createScreens(
         paperOpen = true;
         paperLayer.classList.add('is-open');
         bus.emit('PaperOverlayOpened');
+        // The body reveal: the world drains to ink under the held shot.
+        if (inkRevealArmed) setGlobalGrade('inkReveal', 1.8);
         setTimeout(() => {
           if (!paperOpen) return;
           window.addEventListener('keydown', onPaperKey);
@@ -680,6 +818,9 @@ export function createScreens(
     },
     setProjector(fn: ScreensProjector | null): void {
       projector = fn;
+    },
+    setAudioHooks(hooks: ScreensAudioHooks): void {
+      audioHooks = hooks;
     },
   };
 }

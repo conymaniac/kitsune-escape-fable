@@ -1,12 +1,14 @@
 /**
- * Yanagi onna ghost shader (STREAM A, M2 — TECH_SPEC §1).
+ * Yanagi onna ghost shader (STREAM A, M2 — TECH_SPEC §1; M4-P2 dissolve).
  *
  * Translucent spectral body: fresnel rim in kitsunebi teal over a bone-
  * smoke core, slow upward-scrolling value noise eroding alpha at the hem
  * (keyed to uv.y, so every primitive — robe cylinder, arm tubes, vfx
  * smoke quads — tatters at its lower edge regardless of scale), and a
  * uDissolve 0..1 noise-threshold cutoff with a bright violet edge band
- * for the finale unravelling. Max opacity ≈ 0.85.
+ * for the finale unravelling. The cutoff is biased by +uv.y so the LOW
+ * parts erode first — she unravels bottom-up, "drawn up by one last
+ * gust" (DESIGN §5). Max opacity ≈ 0.85.
  *
  * CONTRACT GLUE (yanagi.ts / vfx.ts must keep working unchanged):
  * - Both consumers clone() the kit material and animate `material.opacity`.
@@ -17,6 +19,13 @@
  * - clone() is patched to mint a fresh proxied material (re-linking the
  *   shared time uniforms that ShaderMaterial.clone would deep-copy) and
  *   carry over the current opacity.
+ *
+ * M4-P2 EXTRA — `setGhostDissolve(mat, t)`: drives the EROSION directly
+ * while holding body opacity high until the very end (uOpacity only
+ * fades over the last quarter), so the finale reads as eroding into
+ * smoke instead of a uniform cross-fade. Returns false on non-shader
+ * stubs so callers can fall back to the opacity path. The plain
+ * `.opacity` proxy is untouched (vfx smoke keeps its fade-and-tatter).
  */
 import * as THREE from 'three';
 import { palette } from '@/style/palette';
@@ -69,12 +78,14 @@ void main() {
   float hemN = ksValueNoise2(vec2(vUv.x * 6.0 + vObj.x * 2.3, vUv.y * 3.0 - uTime * 0.32));
   alpha *= smoothstep(0.03, 0.42, vUv.y + (hemN - 0.5) * 0.5);
 
-  // dissolve: noise-threshold cutoff with a bright edge band
-  float dn = ksValueNoise2(vUv * 5.0 + vObj.xy * 1.4 + 7.7);
-  float cut = uDissolve * 1.2;
+  // dissolve: noise-threshold cutoff with a bright edge band. The +vUv.y
+  // bias makes low fragments fail first — she unravels bottom-up, drawn
+  // upward into smoke (DESIGN §5 reveal).
+  float dn = ksValueNoise2(vUv * 5.0 + vObj.xy * 1.4 + 7.7) + vUv.y * 0.55;
+  float cut = uDissolve * 1.75;
   float keep = step(cut, dn + 0.03);
-  float edge = (1.0 - smoothstep(0.0, 0.16, dn + 0.03 - cut)) * keep * step(0.002, uDissolve);
-  col += uEdge * edge * 2.4;
+  float edge = (1.0 - smoothstep(0.0, 0.22, dn + 0.03 - cut)) * keep * step(0.002, uDissolve);
+  col += uEdge * edge * 2.6;
   alpha *= keep;
 
   gl_FragColor = vec4(col, alpha);
@@ -86,6 +97,24 @@ interface GhostUniforms {
   uOpacity: { value: number };
   uDissolve: { value: number };
   [key: string]: THREE.IUniform;
+}
+
+/**
+ * Erosion-led dissolve (the finale): t 0..1 drives uDissolve directly;
+ * uOpacity holds near-full until the last quarter so the body visibly
+ * tatters apart instead of fading. Returns true if `mat` is a ghost
+ * ShaderMaterial; false for stub kits (caller falls back to .opacity).
+ */
+export function setGhostDissolve(mat: THREE.Material, t: number): boolean {
+  const uniforms = (mat as THREE.ShaderMaterial).uniforms as GhostUniforms | undefined;
+  if (!uniforms || !uniforms.uDissolve || !uniforms.uOpacity) return false;
+  const k = Math.min(1, Math.max(0, t));
+  uniforms.uDissolve.value = k;
+  // hold presence while eroding; only the last scraps fade
+  const fadeIn = Math.min(1, Math.max(0, (k - 0.75) / 0.25));
+  const fade = fadeIn * fadeIn * (3 - 2 * fadeIn);
+  uniforms.uOpacity.value = GHOST_MAX_OPACITY * (1 - fade);
+  return true;
 }
 
 export function createGhostMaterial(): THREE.ShaderMaterial {
