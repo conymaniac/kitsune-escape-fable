@@ -1,8 +1,8 @@
 /**
  * Yanagi onna — the ghost woman under the Cursed Willow, cradling a baby
- * bundle. STREAM C, M1 placeholder geometry, FINAL rig + APIs.
+ * bundle. STREAM C, M2 real art inside the FINAL rig + APIs.
  *
- * Group tree (names FINAL — M2 swaps only the meshes inside):
+ * Group tree (names FINAL — M2 swapped only the meshes inside):
  *   yanagi
  *   └─ hover            (slow Y sine; wind sway lean)
  *      └─ robe          (pivot at hem — standAndBow pitches here)
@@ -10,18 +10,43 @@
  *         ├─ armL / armR  (cradle pivots at shoulders)
  *         └─ bundle     (the baby bundle in her arms)
  *
- * No legs below the shawl hem — the robe is a tapered shell that ends
- * above the ground; she hovers.
+ * Look (DESIGN canon): young woman in a long PURPLE kimono, head bowed to
+ * the baby bundle wrapped in a cream shawl, long loose black hair down her
+ * back. The robe is a bell-shaped lathe whose hem floats above the ground
+ * — no legs — and the ghost shader's uv.y hem erosion tatters it into
+ * nothing. Faint floral pattern = pale-violet petal quads hovering just
+ * off the robe surface (the ghost shader has no vertex colors, so pattern
+ * lives in tinted material clones + geometry).
+ *
+ * Every part uses an owned clone of kit.ghost(); clones get their uBase
+ * uniform tinted per part (kimono purple / pale bone / ink hair / aged
+ * shawl) with a defensive fallback for non-shader kits. The setDissolve →
+ * material.opacity path is untouched: the ghost material proxies opacity
+ * into uOpacity + uDissolve internally.
  *
  * APIs (FINAL):
- *   setDissolve(t 0..1)  — M1 fades opacity; M2 swaps in the ghost shader's
- *                          uDissolve without touching this signature.
+ *   setDissolve(t 0..1)  — fades all owned ghost clones (shader dissolve).
  *   setWindSway(strength) — 0..1 sway amplitude tie-in for the WindSystem.
  *   standAndBow(onComplete?) — one-shot finale pose lerp: rise, bow, rise.
  */
 import * as THREE from 'three';
 import type { MaterialKit, MotionState } from '@/core/types';
+import { col, colMix, fuse, lathe, remapUvY, xf } from './geo';
 import { CharacterBase, clamp01, lerp, limbPivot, meshIn, namedGroup, smoothstep01 } from './rig';
+
+/** Tint a ghost-clone's base color (shader uBase, or .color on stubs). */
+function tintGhost(mat: THREE.Material, color: THREE.Color): void {
+  const uniforms = (mat as THREE.ShaderMaterial).uniforms as
+    | Record<string, THREE.IUniform | undefined>
+    | undefined;
+  const base = uniforms?.['uBase']?.value as unknown;
+  if (base instanceof THREE.Color) {
+    base.copy(color);
+    return;
+  }
+  const plain = (mat as unknown as { color?: unknown }).color;
+  if (plain instanceof THREE.Color) plain.copy(color);
+}
 
 /** Resting hover height of the hem above the ground. */
 const HOVER_BASE = 0.05;
@@ -57,40 +82,113 @@ export class Yanagi extends CharacterBase {
   constructor(kit: MaterialKit) {
     super('yanagi', { stride: 0, crossfadeSec: 0.3, headingRate: 6, speedRef: 1 });
 
-    // One cloned ghost material per instance: fading opacity must never
-    // mutate the shared cached kit.ghost() used elsewhere (wisps, smoke).
-    const ghost = kit.ghost().clone();
-    this.ghostMats.push(ghost);
+    // Owned ghost-material clones, tinted per part: fading opacity must
+    // never mutate the shared cached kit.ghost() used elsewhere (smoke).
+    const ghostRobe = kit.ghost().clone();
+    tintGhost(ghostRobe, col('kimonoPurple'));
+    const ghostPale = kit.ghost().clone(); // bone-smoke default (face)
+    const ghostHair = kit.ghost().clone();
+    tintGhost(ghostHair, colMix('inkBlack', 'nightIndigo', 0.45));
+    const ghostShawl = kit.ghost().clone();
+    tintGhost(ghostShawl, col('paperAged'));
+    const ghostPetal = kit.ghost().clone();
+    tintGhost(ghostPetal, colMix('kimonoPurple', 'smokeWhite', 0.55));
+    this.ghostMats.push(ghostRobe, ghostPale, ghostHair, ghostShawl, ghostPetal);
 
     this.hover = namedGroup('hover', this.root);
     this.robe = namedGroup('robe', this.hover);
 
-    // — robe shell: tapered, hem ends above ground, NO legs —
-    meshIn(this.robe, new THREE.CylinderGeometry(0.105, 0.36, 1.0, 12), ghost, 0, 0.68, 0, 'robeMesh');
-    const shoulders = meshIn(this.robe, new THREE.SphereGeometry(0.13, 10, 8), ghost, 0, 1.16, 0, 'shoulders');
-    shoulders.scale.set(1.45, 0.6, 1);
+    // — robe shell: bell-shaped kimono lathe, hem floats above ground, NO
+    //   legs. Profile starts at the hem so uv.y 0 = hem → shader erosion
+    //   tatters the lower edge into nothing. —
+    const robeGeo = lathe(
+      [
+        [0.42, 0.1], // floating hem
+        [0.36, 0.34],
+        [0.255, 0.64],
+        [0.175, 0.92], // waist
+        [0.19, 1.06], // chest
+        [0.155, 1.16], // shoulders
+        [0.06, 1.23], // neck
+        [0.004, 1.255], // closed top
+      ],
+      10,
+    );
+    meshIn(this.robe, robeGeo, ghostRobe, 0, 0, 0, 'robeMesh');
 
-    // — head + long hair down the back —
+    // — faint floral pattern: pale-violet petal quads riding just off the
+    //   robe surface (uv.y remapped up so they dodge the hem erosion) —
+    const petalAt = (theta: number, y: number, r: number, tilt: number): THREE.BufferGeometry =>
+      xf(remapUvY(new THREE.PlaneGeometry(0.075, 0.075), 0.5, 1), {
+        x: Math.sin(theta) * (r + 0.012),
+        y,
+        z: Math.cos(theta) * (r + 0.012),
+        ry: theta,
+        rz: tilt,
+      });
+    const petals = fuse(
+      petalAt(0.3, 0.45, 0.32, 0.5),
+      petalAt(-0.55, 0.62, 0.26, -0.3),
+      petalAt(1.1, 0.78, 0.21, 0.2),
+      petalAt(-1.3, 0.38, 0.345, 0.7),
+      petalAt(2.0, 0.55, 0.285, -0.5),
+      petalAt(0.05, 0.95, 0.18, 0.35),
+    );
+    meshIn(this.robe, petals, ghostPetal, 0, 0, 0, 'kimonoFlorals');
+
+    // — head (bowed toward the bundle by animate()) + long loose hair —
     this.head = namedGroup('head', this.robe, 0, 1.24, 0);
-    meshIn(this.head, new THREE.SphereGeometry(0.125, 12, 10), ghost, 0, 0.08, 0, 'headMesh');
-    this.hairMesh = meshIn(this.head, new THREE.SphereGeometry(0.135, 10, 8), ghost, 0, -0.02, -0.07, 'hairMesh');
-    this.hairMesh.scale.set(1.05, 1.9, 0.8);
+    meshIn(this.head, new THREE.SphereGeometry(0.115, 7, 4), ghostPale, 0, 0.075, 0.01, 'headMesh');
+    const hairCap = xf(new THREE.SphereGeometry(0.135, 7, 4), {
+      y: 0.085,
+      z: -0.025,
+      sx: 1.02,
+      sy: 1.05,
+    });
+    const hairFall = xf(new THREE.SphereGeometry(0.1, 6, 4), {
+      y: -0.22,
+      z: -0.13,
+      sx: 0.8,
+      sy: 2.6,
+      sz: 0.42,
+    });
+    const strand = (side: 1 | -1): THREE.BufferGeometry =>
+      xf(new THREE.ConeGeometry(0.025, 0.34, 4), {
+        x: side * 0.105,
+        y: -0.1,
+        z: 0.03,
+        rx: Math.PI,
+        rz: side * 0.1,
+      });
+    this.hairMesh = meshIn(
+      this.head,
+      fuse(hairCap, hairFall, strand(1), strand(-1)),
+      ghostHair,
+      0,
+      0,
+      0,
+      'hairMesh',
+    );
 
-    // — cradling arms (pivot at shoulders, hang −Y, folded inward) —
-    const armGeo = new THREE.CylinderGeometry(0.035, 0.042, 0.34, 7);
+    // — cradling kimono sleeves (pivot at shoulders, hang −Y, folded
+    //   inward by animate(); open ends erode like the hem) —
+    const sleeveGeo = (): THREE.BufferGeometry =>
+      new THREE.CylinderGeometry(0.05, 0.105, 0.4, 6, 1, true);
     this.armL = limbPivot('armL', this.robe, 0.15, 1.14, 0.04);
     this.armR = limbPivot('armR', this.robe, -0.15, 1.14, 0.04);
-    meshIn(this.armL, armGeo, ghost, 0, -0.17, 0, 'armLMesh');
-    meshIn(this.armR, armGeo, ghost, 0, -0.17, 0, 'armRMesh');
+    meshIn(this.armL, sleeveGeo(), ghostRobe, 0, -0.2, 0, 'armLMesh');
+    meshIn(this.armR, sleeveGeo(), ghostRobe, 0, -0.2, 0, 'armRMesh');
 
-    // — the baby bundle in her arms —
-    const bundle = namedGroup('bundle', this.robe, 0, 0.92, 0.2);
-    const bundleMesh = meshIn(bundle, new THREE.SphereGeometry(0.095, 10, 8), ghost, 0, 0, 0, 'bundleMesh');
-    bundleMesh.scale.set(1.6, 1, 1);
-    bundleMesh.rotation.z = 0.25;
+    // — the baby bundle: cream shawl wrap with a swaddled head bump —
+    // (pushed slightly forward of the sleeves so it silhouettes at iso
+    // distance — "head bowed toward the baby" must read)
+    const bundle = namedGroup('bundle', this.robe, 0, 0.92, 0.24);
+    const wrap = xf(new THREE.SphereGeometry(0.095, 6, 4), { sx: 1.62, sy: 0.95, sz: 1.1, rz: 0.25 });
+    const bump = xf(new THREE.SphereGeometry(0.05, 5, 3), { x: 0.125, y: 0.04, z: 0.01 });
+    meshIn(bundle, fuse(wrap, bump), ghostShawl, 0, 0, 0, 'bundleMesh');
 
-    // Remember base opacity for the dissolve fade.
-    this.baseOpacities.push(ghost.opacity);
+    // Remember base opacities for the dissolve fade.
+    for (const mat of this.ghostMats) this.baseOpacities.push(mat.opacity);
   }
 
   // ── final public APIs ──

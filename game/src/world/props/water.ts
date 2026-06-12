@@ -15,7 +15,7 @@
  */
 import * as THREE from 'three';
 import type { MaterialKit } from '@/core/types';
-import { faceted, jitterRadial, noise2, paintVertexColors, tone } from '@/world/props/meshUtils';
+import { faceted, jitterRadial, mergeGeoms, noise2, paintVertexColors, tone } from '@/world/props/meshUtils';
 
 export interface WaterBuild {
   group: THREE.Group;
@@ -84,32 +84,37 @@ export function buildWater(kit: MaterialKit): WaterBuild {
   lake.userData['noMerge'] = true;
   group.add(lake);
 
-  // — south creek (west piece · 2 m narrows at B1 · east piece) —
-  const creekWest = new THREE.Mesh(new THREE.PlaneGeometry(30, 4, 40, 6), waterMat);
-  creekWest.rotateX(-Math.PI / 2);
-  creekWest.position.set(-25, 0.04, 5);
-  creekWest.userData['noMerge'] = true;
-  group.add(creekWest);
+  // — creeks, ONE merged mesh (draw-call budget §7): south creek west
+  //   piece · 2 m Bound-gap narrows at B1 · east piece · north creek.
+  //   Transforms baked; the shader is world-space so merging is free. —
+  const creekPieces: Array<[number, number, number, number, number, number, 'x' | 'z']> = [
+    [30, 4, 40, 6, -25, 5, 'x'], // [w, d, segW, segD, x, z, longAxis]
+    [4, 2, 8, 4, -8, 5, 'x'], // the B1 narrows
+    [21, 4, 28, 6, 4.5, 5, 'x'],
+    [2.5, 8.5, 4, 12, 16.25, -25, 'z'], // north creek (ridge → lake)
+  ];
+  const creekGeoms = creekPieces.map(([w, d, sw, sd, x, z, longAxis]) => {
+    const g = new THREE.PlaneGeometry(w, d, sw, sd);
+    // The shader's shore term is radial uv distance (built for the lake
+    // disc). Pin the LONG-axis uv at 0.5 so a creek strip lightens at its
+    // BANKS only — otherwise the ring stamps a bright ellipse mid-stream
+    // (read badly on the short north creek).
+    const uv = g.getAttribute('uv');
+    for (let i = 0; i < uv.count; i += 1) {
+      if (longAxis === 'x') uv.setX(i, 0.5);
+      else uv.setY(i, 0.5); // plane v runs along d → world Z after rotateX
+    }
+    uv.needsUpdate = true;
+    g.rotateX(-Math.PI / 2);
+    g.translate(x, 0.04, z);
+    return g;
+  });
+  const creeks = new THREE.Mesh(mergeGeoms(creekGeoms), waterMat);
+  creeks.name = 'creeks';
+  creeks.userData['noMerge'] = true;
+  group.add(creeks);
 
-  const creekNarrows = new THREE.Mesh(new THREE.PlaneGeometry(4, 2, 8, 4), waterMat);
-  creekNarrows.rotateX(-Math.PI / 2);
-  creekNarrows.position.set(-8, 0.04, 5);
-  creekNarrows.name = 'creek-bound-gap';
-  creekNarrows.userData['noMerge'] = true;
-  group.add(creekNarrows);
-
-  const creekEast = new THREE.Mesh(new THREE.PlaneGeometry(21, 4, 28, 6), waterMat);
-  creekEast.rotateX(-Math.PI / 2);
-  creekEast.position.set(4.5, 0.04, 5);
-  creekEast.userData['noMerge'] = true;
-  group.add(creekEast);
-
-  // — north creek (ridge → lake) + mossy stepping stones —
-  const creekNorth = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 8.5, 4, 12), waterMat);
-  creekNorth.rotateX(-Math.PI / 2);
-  creekNorth.position.set(16.25, 0.04, -25);
-  creekNorth.userData['noMerge'] = true;
-  group.add(creekNorth);
+  // — mossy stepping stones over the north creek —
 
   const stoneMat = kit.toon('inkCharcoal', { vertexColors: true });
   const stonePositions: Array<[number, number]> = [

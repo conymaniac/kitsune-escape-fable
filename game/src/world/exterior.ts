@@ -6,10 +6,14 @@
  * Prevailing wind blows NW→SE, i.e. direction ≈ (+0.7, +0.7) on XZ —
  * wind shadows sit on the SE (lee) side of their obstacles.
  *
- * GREYBOX (M1): primitive stand-ins, but every POSITION, COLLIDER, ANCHOR,
- * LASH ZONE and WIND SHADOW here is FINAL gameplay data — D-core builds on
- * these exact values. M2 replaces prop internals behind the same
- * signatures.
+ * M2 (real art): every POSITION, COLLIDER, ANCHOR, LASH ZONE and WIND
+ * SHADOW here is FINAL M1 gameplay data — only prop internals changed.
+ * Nearly every static prop now routes through mergeStatic (draw-call
+ * budget §7): meshes that gameplay references by identity/name (lantern
+ * cores, shrine-mask, cuttable-0..2, cottage-door/window, body-mound,
+ * ground/water shader surfaces) are userData.noMerge and pass through
+ * the merge with their ORIGINAL object identity preserved. Animated
+ * pivots (farm gate) and wisps stay out of the merge entirely.
  *
  * Route (≈80 u of path spawn→ghost, ≈125 u spawn→cottage via the willow):
  *   [S] spawn glade (-8, 27) → [A] mask shrine (-8.8, 15) (12 u)
@@ -35,6 +39,7 @@ import type {
 } from '@/core/types';
 import { aabb, circle, offsetColliders } from '@/world/colliders';
 import { mergeStatic } from '@/world/merge';
+import { faceted, jitterRadial, noise2, paintVertexColors, tone } from '@/world/props/meshUtils';
 import { buildTerrain } from '@/world/props/terrain';
 import { buildWater, makeDock } from '@/world/props/water';
 import { buildWillow } from '@/world/props/willow';
@@ -78,19 +83,22 @@ export function buildExterior(kit: MaterialKit): ExteriorBuild {
   dressing.name = 'exterior-dressing';
 
   // ───────────────────────────────────────── terrain · water · sky ──
-  group.add(buildTerrain(kit).group);
-  group.add(buildWater(kit).group);
+  // terrain/water route through the merge: ground + water surfaces are
+  // noMerge (named/shader meshes) and pass through with identity intact;
+  // path ribbons, the promontory pad and stepping stones collapse.
+  dressing.add(buildTerrain(kit).group);
+  dressing.add(buildWater(kit).group);
   group.add(buildSky(kit).group);
 
   const dock = makeDock(kit);
   dock.position.set(15.2, 0, -1.25);
-  group.add(dock);
+  dressing.add(dock);
 
   // ─────────────────────────────────────────────── [S] spawn glade ──
   const sleepingTree = makeTree(kit, 6.2);
   sleepingTree.position.set(-10.5, 0, 27.5);
   sleepingTree.scale.x = 1.25; // broad, sheltering silhouette
-  group.add(sleepingTree);
+  dressing.add(sleepingTree);
   const gladeRock = makeBoulder(kit, 0.4, 3); // the WASD-glyph stone
   gladeRock.position.set(-7, 0, 25.5);
   dressing.add(gladeRock);
@@ -99,12 +107,12 @@ export function buildExterior(kit: MaterialKit): ExteriorBuild {
   const shrine = makeShrine(kit);
   shrine.group.position.set(-9.4, 0, 15);
   shrine.group.rotation.y = Math.PI / 2.3; // faces the path
-  group.add(shrine.group);
+  dressing.add(shrine.group); // 'shrine-mask' is noMerge — identity survives
 
   // ─────────────────────────────── hollow log size-gate (fox-only) ──
   const log = makeHollowLog(kit);
   log.position.set(-8, 0, 9);
-  group.add(log);
+  dressing.add(log);
   // brush plugging the corridor flanks so the blockage reads
   const bushRand = seededRandom(57);
   for (const bx of [-13.2, -11.7, -10.6, -5.1, -3.9, -2.7]) {
@@ -152,23 +160,31 @@ export function buildExterior(kit: MaterialKit): ExteriorBuild {
     const willow = buildWillow(kit, { height: wh });
     willow.group.position.set(wx, 0, wz);
     willow.group.rotation.y = wx + wz; // deterministic variety
-    group.add(willow.group);
+    dressing.add(willow.group);
   }
 
   // ─────────────── [C] the Cursed Willow on the promontory + ghost ──
   const cursed = buildWillow(kit, { cursed: true, height: 7 });
   cursed.group.position.set(21, 0.16, -12.5); // on the promontory pad
-  group.add(cursed.group);
-  // body mound at the roots
-  const mound = new THREE.Mesh(new THREE.SphereGeometry(0.8, 9, 6), kit.toon('earthBrown'));
-  mound.scale.set(1.15, 0.35, 1);
+  dressing.add(cursed.group); // cuttable-0..2 are noMerge — refs survive
+  // body mound at the roots — low grave-shaped earth swell, grass creeping
+  // up its skirt (the reveal's quiet stage; named for safety, kept whole)
+  const moundGeo = faceted(jitterRadial(new THREE.SphereGeometry(0.8, 10, 7), 0.12, 53));
+  moundGeo.scale(1.15, 0.35, 1);
+  paintVertexColors(moundGeo, (x, y, z, out) => {
+    const j = 0.72 + 0.3 * noise2(x * 4 + 5, z * 4 - y);
+    out.setRGB(j, j, j * 0.97);
+    if (y < 0.1) out.lerp(tone('earthBrown', 'grassNight'), 0.5); // grass skirt
+  });
+  const mound = new THREE.Mesh(moundGeo, kit.toon('earthBrown', { vertexColors: true }));
   mound.position.set(20.2, 0.16, -11.8);
   mound.name = 'body-mound';
-  group.add(mound);
+  mound.userData['noMerge'] = true;
+  dressing.add(mound);
   // promontory wind-shadow rock (the finale's staging cover)
   const promRock = makeBoulder(kit, 0.85, 11);
   promRock.position.set(17.2, 0.16, -10.8);
-  group.add(promRock);
+  dressing.add(promRock);
 
   // ───────────────────────── open field: 3 boulders (wind shadows) ──
   const boulderSpots: Array<[number, number, number, number]> = [
@@ -179,7 +195,7 @@ export function buildExterior(kit: MaterialKit): ExteriorBuild {
   for (const [bx, bz, br, seed] of boulderSpots) {
     const boulder = makeBoulder(kit, br, seed);
     boulder.position.set(bx, 0, bz);
-    group.add(boulder);
+    dressing.add(boulder);
   }
 
   // ──────────────────────────────── [D] cottage + yard (NW corner) ──
@@ -187,7 +203,7 @@ export function buildExterior(kit: MaterialKit): ExteriorBuild {
   const COTTAGE_Z = -21;
   const cottage = buildCottage(kit);
   cottage.group.position.set(COTTAGE_X, 0, COTTAGE_Z);
-  group.add(cottage.group);
+  dressing.add(cottage.group); // 'cottage-door'/'cottage-window' are noMerge
 
   // yard fences (south run with path opening · east run with fox gap)
   const yardSouthWest = makeFenceRun(kit, 9.9);
@@ -274,11 +290,14 @@ export function buildExterior(kit: MaterialKit): ExteriorBuild {
     [-22.4, -9.6], // cottage path
     [15, -13.8], // promontory south edge
   ];
+  // routed through the merge: the 8 stone bodies collapse into the shared
+  // inkCharcoal bucket; the emissive cores are noMerge, so the ORIGINAL
+  // flicker-target meshes pass through with identity intact.
   const lanternCores: THREE.Mesh[] = [];
   for (const [lx, lz] of lanternSpots) {
     const lantern = makeStoneLantern(kit);
     lantern.group.position.set(lx, 0, lz);
-    group.add(lantern.group);
+    dressing.add(lantern.group);
     lanternCores.push(lantern.core);
   }
 
@@ -286,7 +305,7 @@ export function buildExterior(kit: MaterialKit): ExteriorBuild {
   const cursedWisps = createWisps(
     kit,
     [v3(20, 2.6, -13.6), v3(21.8, 3.4, -11.6), v3(22.6, 2.2, -13), v3(19.6, 3.8, -11.9), v3(21.2, 4.4, -12.8)],
-    { drift: 0.5 },
+    { drift: 0.5, colorKey: 'spectralViolet' }, // canon: violet canopy motes
   );
   group.add(cursedWisps.group);
   const lakeWisps = createWisps(

@@ -38,22 +38,25 @@ Branch: `claude/wonderful-mclean-bad83d`. New app: `game/`. CLEAN-ROOM: never to
       scripted browser walkthrough at ~30 fps via rAF pump — background tab;
       every beat passed, zero console errors/warnings; details in D2 notes.
       A human 60 fps feel-pass remains on the M4 PLAYTEST line)
-- [ ] COMMIT M1
+- [x] COMMIT M1
 
 ## M2 — Art pass (parallel: A-style, B-world, C-chars)
 - [x] A-style: ramps.ts, real materials.ts, shaders/* (water, sway, ghost, wisp, chunks),
       lighting.ts, postfx.ts — finished + browser-verified after interrupted-WIP audit;
       postfx white-out root-caused and fixed (see M2 A-style notes)
-- [ ] B-world: real props (terrain, water, willow w/ cuttable branches, cottage, vegetation,
-      lanterns, interior props, sky/moon/stars, wisps), merge.ts
-- [ ] C-chars: real mizumiHuman/mizumiFox/yanagi meshes + procedural anim, ink hulls, vfx.ts
-- [ ] COMMIT M2
+- [x] B-world: real props (terrain, water, willow w/ cuttable branches, cottage, vegetation,
+      lanterns, interior props, sky/moon/stars, wisps), merge.ts — finished + browser-verified
+      after interrupted-WIP audit; exterior scene draws now within the ≤120 budget
+      (see M2 B-world notes)
+- [x] C-chars: real mizumiHuman/mizumiFox/yanagi meshes + procedural anim, ink hulls, vfx.ts
+      — WIP audited, finished + browser-verified (see M2 C-chars notes)
+- [x] COMMIT M2
 
 ## M3 — Audio pass (parallel with M2)
 - [x] audio/engine.ts real (Tone bootstrap, buses, duck, mute)
 - [x] audio/music.ts (D insen BGM states + lullaby + wind ambience)
 - [x] audio/sfx.ts (~13 recipes)
-- [ ] COMMIT M3
+- [x] COMMIT M3
 
 ## M4 — Juice & polish
 - [ ] P1 gameplay feel: gust/knockdown tuning, papers, camera micro-moves, leap arc,
@@ -478,6 +481,137 @@ proxies on ghost/wisp) — but it shipped with the postfx white-out.
   (mostly the 8 un-merged stone-lantern groups — B-world merge scope);
   interior ~86 vs ≤60 (C-chars avatar part count). Tris 71.9k / 2.3k —
   far under 150k. Flagged for the M5 perf audit, not fixed here.
+
+### M2 C-chars — notes (2026-06-12)
+A first C-chars M2 agent left uncommitted WIP (new geo.ts + reskinned human/
+fox/yanagi + vfx smoke tweak); it was AUDITED, finished and browser-verified
+by a second agent (same pattern as A-style/F-audio). Audit verdict: complete
+and contract-clean — all named groups/pivots/APIs/anim code intact, palette
+keys valid, ghost-clone dissolve path untouched. Two art fixes + one polish
+were applied on top (below). All public APIs and the rig contract unchanged.
+- **NEW characters/geo.ts** — mesh-crafting helpers: xf (bake TRS), warp,
+  paint/paintFlat (vertex colors over pre-bake coords), mulFor (palette-key
+  multiplier vs toon base color — vertex colors MULTIPLY in MeshToonMaterial),
+  fuse (merge + dispose), lathe (radii clamped ≥4 mm), remapUvY (dodge ghost
+  hem erosion). NaN-guards baked in per the A-style white-out lesson; runtime
+  attribute scan of all three rigs: 0 NaN, 0 zero-length normals.
+- **mizumiHuman** (498 tris, 10 meshes + 10 ink hulls = 20 draws, same draw
+  count as the M1 placeholder): ~5-head teenage girl — indigo kimono lathe
+  top + cream collar V + vermillion obi/knot, dark indigo-black bob + side
+  flaps + low twin-tails, kitsune mask worn OFF-face on the head's right
+  (cream plate, vermillion brow + ear tips), flared knee-length skirt panels
+  w/ cream under-robe hem on the 4 existing springs, bare legs + wooden
+  sandals. One vertex-colored toon material (paperBone base). NOTE: ~42 %
+  over the ~350 spec budget — kept for head/mask/sleeve readability; tris
+  are perf-noise vs the 150k frame budget and draw count didn't grow.
+- **mizumiFox** (358 tris, 11+11 hulls): slender kitsune — vermillion-orange
+  coat melting to cream belly/chest ruff (normal-based paint), white face
+  mask-markings + dark nose, BIG dark-tipped ear blades, dark sock legs,
+  3-seg brush tail. smokeWhite toon base so whites stay faintly spectral.
+- **yanagi** (368 tris, 7 draws, no hulls — ghost shader IS the outline):
+  bell-lathe purple kimono w/ hem floating above ground (uv.y 0 at hem →
+  shader erosion tatters it to nothing, no legs), bowed head + long loose
+  black hair (cap/fall/strands), cradling sleeves, cream shawl baby bundle
+  pushed proud of the sleeves so it silhouettes at iso distance, 6 pale-
+  violet petal quads riding the robe (uv.y remapped up past the erosion
+  band) = floral pattern hint. 5 owned ghost-material clones tinted via
+  uBase (kimonoPurple/bone/ink-hair/aged-shawl/petal); setDissolve →
+  opacity → shader uDissolve proxy verified 0.85→0.425→0→restore.
+- **vfx.ts**: smoke pool billboards quad → CircleGeometry(0.55, 8) — the
+  ghost shader's hem erosion tatters a soft octagon instead of flashing
+  hard box corners. Burst ring/wisps/embers/poof untouched.
+- **Anim constant changes** (proportions demanded): human arm splay
+  armLZ/armRZ ±0.12 in locomotion (wide kimono sleeves clear the obi);
+  fox tail SEG_SCALE/SEG_PIVOT retuned twice so the 3 chained segments
+  overlap ~50 % and read as ONE brush (root 0.06/sz1.7 → belly 0.085/sz1.5
+  → tip 0.068/sz1.8 w/ white blend, pivots −0.28/−0.13/−0.13, mesh z −0.1).
+  Everything else (strides, bobs, springs, crossfades, one-shots) M1-exact.
+- **VERIFY (vite dev :5184, scripted browser, zero console errors/warnings):**
+  human idle/walk closeups (mask + obi read both sides) ✓ numeric walk
+  sampling: exact arm/leg counter-swing, bob 0.665–0.72, skirtB spring lag ✓
+  F both directions; frame-frozen mid-burst shot (octagon smoke + violet
+  spiral wisps + flash; swap hidden) ✓ fox closeup + sit (spirit-sense:
+  haunches down, ears pricked, tail curled w/ white tip) ✓ numeric trot:
+  FL=BR/FR=BL diagonal pairs, tail0→1→2 follow-through, random ear flick
+  0.53 rad observed ✓ yanagi: hover sine + sway, cradle pose w/ readable
+  bundle, floral petals, hem tatter; standAndBow timeline sampled
+  (hunch→rise→bow 0.55→straighten, callback fired); dissolve+restore ✓
+  silhouettes read at gameplay vh 14 (ghost = small glowing bowed figure,
+  human's vermillion obi visible) ✓ ink hulls clean, no z-fight halos ✓
+  NaN scan 0 / no white-out ✓ tsc + vite build green; purity + raw-hex
+  greps clean. Tab-sharing note: 5173 was being driven by the parallel
+  B-world agent — added `.claude/launch.json` config `game-dev-c` (:5184)
+  for an isolated session.
+- **Open issues / handoffs:** (1) human 498 vs ~350 tri budget (noted above,
+  recommend accept). (2) The Cursed Willow canopy fully occludes Yanagi AND
+  the player at iso angle from the S/SE approach — DESIGN §4's occluder-fade
+  (to ~15 % ink) is the planned M4 fix; flagging that it's REQUIRED for the
+  finale staging readability, not just polish. (3) Moon-shadow map reads
+  chunky/blocky in closeups (1024² over 40×40 — fine at gameplay zoom;
+  A-style/M5 call). (4) HUD form glyph goes stale only via the DEV-only
+  debug `setFormInstant` path (no FormChanged emit) — not a player-reachable
+  bug, no action needed.
+
+### M2 B-world — notes (2026-06-12)
+A first B-world M2 agent was interrupted mid-work. Its WIP was AUDITED by a
+second agent: committed props (terrain, water, willow, vegetation, lanterns,
+meshUtils) were already done; the UNCOMMITTED worktree WIP (cottage.ts,
+propsInterior.ts, sky.ts, wisps.ts, interior.ts, exterior.ts, water.ts)
+turned out essentially COMPLETE and spec-shaped — all frozen signatures/
+anchors/extras intact (door/window anchors + crate stack, papers[7], drawer/
+dagger/setDrawerOpen/setDoorOpen, cuttableBranches/setGateOpen/update),
+palette-ratio vertex colors via tone()/toneLerp() (no raw hex), thatch =
+5 stacked jittered slope-grid courses w/ straw striations + flared eave +
+ridge/uma-nori, shoji = lattice over warm emissive plane, tatami = beveled
+two-tone alternating-weave w/ heri borders, sky = dome + moon disc w/ maria
++ wisp halo + 2 star Points layers + 2 frayed cloud bands, wisps =
+kit.wisp(colorKey) additive shader w/ spectralViolet cursed-canopy motes,
+Lissajous drift + WindState nudge. The flagged draw-call fix was ALSO
+already in the WIP: 8 stone-lantern bodies + cottage + willows + dock +
+terrain/water dressing all routed through mergeStatic (noMerge identity
+passthrough for cores/named meshes); interior dressing merged likewise.
+- **Audit fixes (this agent):** (1) water.ts — the A-style water shader's
+  shore term is radial in UV space (built for the lake disc); on the short
+  north-creek strip it stamped a bright ELLIPSE mid-stream. Fixed by pinning
+  the long-axis UV at 0.5 per creek piece → creeks now lighten at their
+  BANKS only. (2) interior.ts — kitchen divider repainted as a slid-open
+  shoji panel (cell shadow lines + rails, thinned 0.3→0.12) — it read as a
+  bright white monolith next to the andon; added the mood-board kitchen
+  wall rack over the counter (rail + ladle + clay pot + cleaver, all in the
+  merged dressing → ~0 extra draws).
+- **VERIFY (vite dev, browser screenshots, zero console errors/warnings):**
+  spawn corridor (shrine w/ vermillion roof + mask, hollow log, creek,
+  fences) ✓ willow shore + promontory closeup (cursed willow w/ violet
+  canopy motes, ghost, warm stone lantern, dock, stepping stones) ✓
+  field-to-cottage distance shot — the amber shoji window IS the only warm
+  light and pulls from across the boulder field (DESIGN §4 sightline) ✓
+  cottage closeup (thatch courses + flared eave, post-and-beam walls,
+  engawa, glowing lattice window, crate stack, yard fence + path) ✓
+  interior overview (tatami island, low table w/ 2 moldy plates +
+  chopsticks, unmade futon w/ subtle stain + thrown blanket, 7 scattered
+  diary sheets, andon hearth-light, shrine nook, genkan + sliding door +
+  sandals) ✓ kitchen corner (counter + jar/bowls, hanging utensils, drawer
+  visually slides open w/ dagger on the tray, divider reads as shoji) ✓
+  sky documentation shot at debug vh 150 (moon + soft halo bloom, star
+  field + bright sparks, 2 cloud bands, horizon band melt) ✓ NO white-out
+  anywhere (NaN guards held; no new degenerate geometry). tsc + vite build
+  green; purity + raw-hex greps clean.
+- **Draw calls (total per frame incl. ~16 composer passes, pixelRatio
+  1.75):** willow-shore view 123 total ≈ ~107 scene draws (was 165/~148 at
+  the A-style audit — Δ ≈ −41); cottage view 105 ≈ ~89; interior 69 ≈ ~53.
+  Budgets met: exterior ≤120 ✓, interior ≤60 ✓. Tris ~82k exterior / ~9.5k
+  interior (≤150k ✓).
+- **Notes / handoffs:** (1) The moon disc can NEVER enter the gameplay
+  frustum (iso ortho at vh 14 — any upper-dome feature projects v≈70 u;
+  the dome contributes the horizon-band melt + low stars; the moon exists
+  for the water-shader glint axis + title/debug framings). Not a bug —
+  geometry of the camera. (2) Interior camera is bounds-pinned to the room
+  centre, so the kitchen alcove always reads at overview distance — drawer
+  open/close is visible but small; M4 may want a brief camera nudge on
+  setDrawerOpen. (3) wisps flicker per-mesh via scale (shader uPhase is
+  per-material and kit.wisp() caches per colorKey — scale flicker keeps the
+  cache shared). (4) Exterior `update(dt, wind)` drives wisps + lantern
+  flicker — already wired in main.ts.
 
 ### M3 F-audio — notes (2026-06-12)
 A first F-audio agent was interrupted mid-work; its WIP (engine.ts buses,

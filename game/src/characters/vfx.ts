@@ -88,6 +88,9 @@ export class VfxSystem {
   private emberAccum = 0;
 
   private readonly quadGeo: THREE.PlaneGeometry;
+  /** Smoke billboards: circles, not quads — the ghost shader's uv.y hem
+   *  erosion tatters a soft octagon instead of flashing hard box corners. */
+  private readonly smokeGeo: THREE.CircleGeometry;
   private readonly ringGeo: THREE.RingGeometry;
   private readonly ownedMats: THREE.Material[] = [];
 
@@ -98,6 +101,7 @@ export class VfxSystem {
     this.root.name = 'vfx';
 
     this.quadGeo = new THREE.PlaneGeometry(1, 1);
+    this.smokeGeo = new THREE.CircleGeometry(0.55, 8);
     this.ringGeo = new THREE.RingGeometry(0.78, 1, 28);
 
     // Material prototypes — cloned per pooled particle so per-effect
@@ -108,7 +112,7 @@ export class VfxSystem {
     const dustProto = kit.toon('paperAged', { transparent: true, opacity: 0.5 });
 
     this.wisps.push(...this.makePool(POOL_WISPS, this.quadGeo, wispProto, 0.16));
-    this.smoke.push(...this.makePool(POOL_SMOKE, this.quadGeo, smokeProto, 0.3));
+    this.smoke.push(...this.makePool(POOL_SMOKE, this.smokeGeo, smokeProto, 0.3));
     this.embers.push(
       ...this.makePool(POOL_EMBERS, this.quadGeo, emberProto, 0.07, (m) => {
         m.transparent = true;
@@ -296,6 +300,7 @@ export class VfxSystem {
   dispose(): void {
     this.root.removeFromParent();
     this.quadGeo.dispose();
+    this.smokeGeo.dispose();
     this.ringGeo.dispose();
     for (const m of this.ownedMats) m.dispose();
     this.ownedMats.length = 0;

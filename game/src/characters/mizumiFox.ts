@@ -1,7 +1,7 @@
 /**
- * Mizumi — fox form. STREAM C, M1 placeholder geometry, FINAL rig + anim.
+ * Mizumi — fox form. STREAM C, M2 real art inside the FINAL rig.
  *
- * Group tree (names FINAL — M2 swaps only the meshes inside):
+ * Group tree (names FINAL — M2 swapped only the meshes inside):
  *   mizumiFox
  *   └─ body                 (bob / pitch / roll; pivot at chest height)
  *      ├─ head              (pivot at neck; counterphase bob)
@@ -9,15 +9,23 @@
  *      ├─ legFL / legFR / legBL / legBR  (pivot at shoulder/hip, hang −Y)
  *      └─ tail0 ─ tail1 ─ tail2          (chained pivots, extend −Z)
  *
+ * Look (DESIGN mood): slender elegant kitsune — vermillion-orange coat,
+ * cream chest/belly, spectral-white face markings, dark sock legs and ear
+ * tips, one brush tail (thin base → thick belly → tapering white tip).
+ * Base toon key is smokeWhite so the white markings carry a faint spectral
+ * blue — every other tone is a vertex-color multiplier (see geo.ts).
+ *
  * Anim: trot (diagonal leg pairs, spine/head bob counterphase), 3-seg tail
  * follow-through `rot[i] = sin(t*2 − i*0.6) * amp`, random ear-flick timer,
  * leap (tucked), sit (spirit-sense pose), knockdown.
  */
 import * as THREE from 'three';
 import type { CharacterAction, MaterialKit, MotionState } from '@/core/types';
+import { col, fuse, mulFor, paint, paintFlat, xf } from './geo';
 import {
   CharacterBase,
   addInkHull,
+  clamp01,
   limbPivot,
   meshIn,
   mixPose,
@@ -80,65 +88,124 @@ export class MizumiFox extends CharacterBase {
   constructor(kit: MaterialKit) {
     super('mizumiFox', { stride: 4.6, crossfadeSec: 0.14, headingRate: 16, speedRef: 5.0 });
 
-    const coat = kit.toon('foxOrange');
-    const cream = kit.toon('foxCream');
-    const dark = kit.toon('inkCharcoal');
+    // One vertex-colored toon material; smokeWhite base so the white face
+    // markings keep a faint spectral blue (multipliers can only darken).
+    const pelt = kit.toon('smokeWhite', { vertexColors: true });
+
+    const ORANGE = mulFor(col('foxOrange'), 'smokeWhite');
+    const CREAM = mulFor(col('foxCream'), 'smokeWhite');
+    const DARK = mulFor(col('inkCharcoal'), 'smokeWhite');
+    const WHITE = new THREE.Color(1, 1, 1);
 
     this.body = namedGroup('body', this.root, 0, BODY_Y, 0);
 
-    // — body —
-    const bodyMesh = meshIn(this.body, new THREE.SphereGeometry(0.17, 12, 10), coat, 0, 0, -0.02, 'bodyMesh');
-    bodyMesh.scale.set(1, 0.95, 1.9);
-    const chestMesh = meshIn(this.body, new THREE.SphereGeometry(0.1, 10, 8), cream, 0, -0.03, 0.22, 'chestMesh');
+    // — body: slender trunk, orange back melting to a cream belly, plus a
+    //   cream chest ruff — fused into one mesh —
+    const trunk = xf(
+      paint(new THREE.SphereGeometry(0.17, 8, 5), (_p, n, c) => {
+        const belly = clamp01((-n.y - 0.12) / 0.5);
+        c.copy(ORANGE).lerp(CREAM, belly);
+      }),
+      { sx: 0.75, sy: 0.82, sz: 1.95 },
+    );
+    const ruff = xf(paintFlat(new THREE.SphereGeometry(0.095, 6, 4), CREAM), {
+      y: -0.005,
+      z: 0.23,
+      sx: 0.85,
+      sy: 1.05,
+      sz: 0.75,
+    });
+    const bodyMesh = meshIn(this.body, fuse(trunk, ruff), pelt, 0, 0, -0.02, 'bodyMesh');
 
-    // — head (pivot at neck) —
+    // — head (pivot at neck): slim wedge skull + muzzle, white mask-marking
+    //   hints painted on (cheeks/jaw white, nose tip dark) —
     this.head = namedGroup('head', this.body, 0, HEAD_Y, 0.3);
-    const headMesh = meshIn(this.head, new THREE.SphereGeometry(0.115, 12, 10), coat, 0, 0.02, 0, 'headMesh');
-    const muzzle = meshIn(this.head, new THREE.ConeGeometry(0.05, 0.13, 8), cream, 0, -0.01, 0.14, 'muzzle');
-    muzzle.rotation.x = Math.PI / 2;
+    const skull = xf(
+      paint(new THREE.SphereGeometry(0.1, 7, 4), (p, _n, c) => {
+        const cheek = p.y < 0.008 && p.z > 0.02 ? 1 : 0;
+        const brow = p.y > 0.055 && p.z > 0.03 ? 0.55 : 0;
+        c.copy(ORANGE).lerp(WHITE, Math.max(cheek, brow));
+      }),
+      { sx: 0.85, sy: 0.88, sz: 0.98 },
+    );
+    const muzzle = xf(
+      paint(new THREE.ConeGeometry(0.045, 0.15, 6), (p, _n, c) => {
+        if (p.y > 0.06) c.copy(DARK); // nose tip
+        else if (p.z > 0.008) c.copy(WHITE); // white jaw (post-rotation underside)
+        else c.copy(ORANGE);
+      }),
+      { y: -0.028, z: 0.105, rx: Math.PI / 2 },
+    );
+    const headMesh = meshIn(this.head, fuse(skull, muzzle), pelt, 0, 0.02, 0.01, 'headMesh');
 
-    // — ears (pivot at base; cones point up) —
-    const earGeo = new THREE.ConeGeometry(0.038, 0.11, 6);
+    // — ears (pivot at base): BIG flattened blades, dark backs/tips —
     this.earL = limbPivot('earL', this.head, 0.065, 0.1, 0.0);
     this.earR = limbPivot('earR', this.head, -0.065, 0.1, 0.0);
-    const earLMesh = meshIn(this.earL, earGeo, coat, 0, 0.05, 0, 'earLMesh');
-    const earRMesh = meshIn(this.earR, earGeo, coat, 0, 0.05, 0, 'earRMesh');
+    const earGeo = (): THREE.BufferGeometry =>
+      xf(
+        paint(new THREE.ConeGeometry(0.055, 0.17, 4), (p, _n, c) =>
+          c.copy(ORANGE).lerp(DARK, clamp01((p.y + 0.01) / 0.07)),
+        ),
+        { sz: 0.5 },
+      );
+    const earLMesh = meshIn(this.earL, earGeo(), pelt, 0, 0.07, -0.005, 'earLMesh');
+    const earRMesh = meshIn(this.earR, earGeo(), pelt, 0, 0.07, -0.005, 'earRMesh');
 
-    // — legs (pivot at shoulder/hip, hang −Y) — "L" = +X side —
-    const legGeo = new THREE.CylinderGeometry(0.026, 0.032, 0.27, 7);
+    // — legs (pivot at shoulder/hip, hang −Y): slender, dark socks —
     this.legFL = limbPivot('legFL', this.body, 0.08, -0.05, 0.19);
     this.legFR = limbPivot('legFR', this.body, -0.08, -0.05, 0.19);
     this.legBL = limbPivot('legBL', this.body, 0.08, -0.05, -0.17);
     this.legBR = limbPivot('legBR', this.body, -0.08, -0.05, -0.17);
     const legMeshes: THREE.Mesh[] = [];
     for (const leg of [this.legFL, this.legFR, this.legBL, this.legBR]) {
-      legMeshes.push(meshIn(leg, legGeo, dark, 0, -0.125, 0, `${leg.name}Mesh`));
+      const g = paint(new THREE.CylinderGeometry(0.021, 0.029, 0.27, 5), (p, _n, c) =>
+        c.copy(ORANGE).lerp(DARK, clamp01((-p.y - 0.01) / 0.05)),
+      );
+      legMeshes.push(meshIn(leg, g, pelt, 0, -0.125, 0, `${leg.name}Mesh`));
     }
 
-    // — tail: 3 chained segments extending −Z, follow-through layer —
+    // — tail: 3 chained segments extending −Z; brush silhouette —
+    //   thin base → thick belly → tapering spectral-white tip.
+    // Segments are long ellipsoids overlapping ~50 % so the union reads as
+    // ONE brush (thin root → fat belly → tapering white tip), while the
+    // chained pivots still give the follow-through whip.
     const tailMeshes: THREE.Mesh[] = [];
+    const SEG_SCALE: ReadonlyArray<readonly [number, number, number, number]> = [
+      [0.06, 0.82, 0.82, 1.7], // r, sx, sy, sz — root
+      [0.085, 1, 1, 1.5], // brush belly (swallows the root's tail half)
+      [0.068, 0.85, 0.85, 1.8], // tapering tip rooted inside the belly
+    ];
+    const SEG_PIVOT: ReadonlyArray<readonly [number, number]> = [
+      [0.06, -0.28],
+      [0.005, -0.13],
+      [0, -0.13],
+    ];
     let tailParent: THREE.Object3D = this.body;
     for (let i = 0; i < TAIL_SEGMENTS; i++) {
-      const seg = limbPivot(`tail${i}`, tailParent, 0, i === 0 ? 0.06 : 0.015, i === 0 ? -0.3 : -0.16);
-      const segMesh = meshIn(
-        seg,
-        new THREE.CylinderGeometry(0.052 - i * 0.012, 0.06 - i * 0.012, 0.16, 7),
-        i === TAIL_SEGMENTS - 1 ? cream : coat,
-        0,
-        0,
-        -0.08,
-        `tail${i}Mesh`,
+      const [py, pz] = SEG_PIVOT[i] ?? [0, -0.16];
+      const seg = limbPivot(`tail${i}`, tailParent, 0, py, pz);
+      const [r, sx, sy, sz] = SEG_SCALE[i] ?? [0.05, 1, 1, 1.5];
+      const tipBlend = i === TAIL_SEGMENTS - 1;
+      const g = xf(
+        paint(new THREE.SphereGeometry(r, 6, 4), (p, n, c) => {
+          if (tipBlend) c.copy(ORANGE).lerp(WHITE, clamp01((-p.z + 0.005) / 0.06));
+          else c.copy(ORANGE).lerp(CREAM, clamp01((-n.y - 0.3) / 0.5) * 0.55);
+        }),
+        { sx, sy, sz },
       );
-      segMesh.rotation.x = -Math.PI / 2;
+      const segMesh = meshIn(seg, g, pelt, 0, 0, -0.1, `tail${i}Mesh`);
       tailMeshes.push(segMesh);
       this.tail.push(seg);
       tailParent = seg;
     }
 
-    // Ink hulls (characters only).
-    for (const m of [bodyMesh, chestMesh, headMesh, muzzle, earLMesh, earRMesh, ...legMeshes, ...tailMeshes]) {
-      addInkHull(m, kit);
-    }
+    // Ink hulls (characters only) — thin parts get larger hull scales.
+    addInkHull(bodyMesh, kit, 1.035);
+    addInkHull(headMesh, kit, 1.05);
+    addInkHull(earLMesh, kit, 1.08);
+    addInkHull(earRMesh, kit, 1.08);
+    for (const m of legMeshes) addInkHull(m, kit, 1.14);
+    for (const m of tailMeshes) addInkHull(m, kit, 1.06);
   }
 
   protected override animate(dt: number, _motion: MotionState): void {

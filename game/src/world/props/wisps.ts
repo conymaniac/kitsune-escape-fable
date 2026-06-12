@@ -1,14 +1,18 @@
 /**
  * Kitsunebi wisps — drifting spirit lights (guides + ambience).
  *
- * GREYBOX (M1): small kit.wisp() spheres on a per-wisp Lissajous drift
- * around their home points, nudged by the wind when a WindState is given.
- * M2 swaps the material for the additive radial-falloff shader behind the
- * same MaterialKit signature; M4 retargets homes toward quest goals.
+ * M2: kit.wisp() is the real additive radial-falloff shader (A-style) —
+ * its |N·V| facing term fades the sphere silhouette so each wisp reads as
+ * a soft spirit flame. Per-wisp Lissajous drift around home points,
+ * nudged by the wind when a WindState is given; M4 retargets homes toward
+ * quest goals. `colorKey` tints a cluster (the Cursed Willow's canopy
+ * motes are spectralViolet — canon; everything else stays teal).
  * Allocation-free update.
  */
 import * as THREE from 'three';
 import type { MaterialKit, WindState } from '@/core/types';
+import type { PaletteKey } from '@/style/palette';
+import type { KitsuneMaterialKit } from '@/style/materials';
 
 export interface WispsBuild {
   group: THREE.Group;
@@ -20,6 +24,8 @@ export interface WispsOptions {
   size?: number;
   /** Drift amplitude in units (default 0.7). */
   drift?: number;
+  /** Palette tint — kit.wisp(colorKey); default spectralTeal. */
+  colorKey?: PaletteKey;
 }
 
 export function createWisps(
@@ -35,7 +41,11 @@ export function createWisps(
   const meshes: THREE.Mesh[] = [];
   const params: number[] = []; // per wisp: fx, fz, fy, phase
   const geometry = new THREE.SphereGeometry(size, 8, 6);
-  const material = kit.wisp();
+  // The frozen MaterialKit type takes no args; the M2 kit accepts an
+  // optional tint key (style/materials.ts KitsuneMaterialKit).
+  const material = options.colorKey
+    ? (kit as KitsuneMaterialKit).wisp(options.colorKey)
+    : kit.wisp();
 
   for (let i = 0; i < homes.length; i += 1) {
     const home = homes[i];
