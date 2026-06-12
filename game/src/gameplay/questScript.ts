@@ -558,6 +558,8 @@ export class QuestScript {
       position: o.interior.anchors.papers.clone(),
       radius: 1.4,
       promptKey: 'prompt.read',
+      humanOnly: true, // DESIGN §2: reading is a human verb (fox is nose-only)
+      // — the crossed-paw prompt re-teaches F, mirroring the dagger beside it
       enabled: () => inside(),
       onInteract: () => {
         o.audio.playSfx('paperRustle');

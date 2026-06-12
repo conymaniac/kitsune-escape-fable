@@ -66,7 +66,9 @@ Branch: `claude/wonderful-mclean-bad83d`. New app: `game/`. CLEAN-ROOM: never to
       stamp+bloom, title/intro/ending/pause/paper polish, hold-Esc skip, dagger
       icon, EN+CS proofing in context — browser-verified, see M4 P2 notes
       (ONE optional main.ts one-liner left for P1/playtest: pause volume hook)
-- [ ] PLAYTEST: full walkthrough incl. Z1/Z2 refusal branches, both cottage exits, both locales
+- [x] PLAYTEST: full walkthrough incl. Z1/Z2 refusal branches, both cottage exits, both locales
+      — done 2026-06-12, see M4 PLAYTEST notes (3 fixes applied incl. one CRITICAL
+      freeze fix; checklist all-pass; known issues documented below)
 - [ ] COMMIT M4
 
 ## M5 — Ship
@@ -876,3 +878,120 @@ the patched rAF).
 - M0 intro: Esc skips immediately (hold-1s skip is M4 polish); typewriter/choices
   functional in dialogUi but unwired until M1 dialogSystem.
 - GameLoop.add gained optional `runWhenPaused` 3rd param (superset of spec API).
+
+### M4 PLAYTEST — notes (2026-06-12)
+Full quality-gate playtest: one complete EN run at real-time pacing (scripted
+browser on :5173, MessageChannel rAF pump = true 1x wall-clock; synthetic
+keys through the real Input path, walking the real colliders — no teleports
+on the critical path), one full CS run (well beyond the planned spot-run:
+title→intro→Dialog 1 (B1 branch)→diary→dagger→D6→cuts→D7→ending), plus
+targeted audio/pause/mute/persistence sessions. Files touched (3, surgical):
+main.ts (1 line) · audio/sfx.ts · gameplay/questScript.ts (1 flag).
+
+**FIXES APPLIED**
+1. main.ts — the P2 pause-volume one-liner: `screens.setAudioHooks({
+   setMasterVolume: (v) => audio.setMasterVolume(v) })`. VERIFIED live:
+   slider 100→30 ramps master gain 0.5→0.15; restored on release.
+2. audio/sfx.ts — **CRITICAL freeze fix**: recipes share mono synths
+   (thump: windowLeap + footstepWood; boom: transform/knockdown/branchCut)
+   and two triggers ≤0.4 s apart throw a Tone Timeline error ("time must be
+   greater than or equal to the last scheduled time") INSIDE the loop tick —
+   and GameLoop.tick never reschedules after a throw, so the whole game
+   freezes permanently (render/UI keep running; gameplay dead). Hit
+   organically in the CS run: window leap-out while still moving on the wood
+   floor → wood footstep at leap+0.06 s → hard freeze. Reproduced on demand
+   (2-line repro), fixed by wrapping play()/playSlam() recipe bodies in
+   try/catch (worst case under the guard: one quiet layer of one SFX is
+   skipped). RE-VERIFIED in situ: moving window leap → no errors, leap
+   completes, wind/gameplay alive.
+3. audio/sfx.ts — Tone "Max polyphony exceeded" warnings DID reproduce at 1x
+   (8 organic drops in the EN run; deliberate tests confirmed transform
+   gliss + suzu ping overflow at F-spam density — and F-spam is a design
+   pillar). maxPolyphony 6→12 on glissFm/ping/sines. After: 0 drops across
+   7×F-spam, the previously-failing burst, both endings, and ~80 s of
+   exterior/interior crossfading music. (The large historical warning count
+   in the console buffer is attributable to pre-fix runs + the frozen-loop
+   incident where the Transport kept scheduling with no update ticks.)
+4. gameplay/questScript.ts — q-papers (diary) was readable in FOX form;
+   DESIGN §2 reserves "read papers" for human (fox = nose-only). Added
+   `humanOnly: true` — crossed-paw re-teaches F, mirroring the adjacent
+   dagger. (Mechanism verified 3× this session on gate/door/dagger.)
+
+**CANON CHECKLIST (DESIGN §9) — all PASS**
+- 15 m ambient trigger ✓ (ambientHeard + whisper event on the shore walk)
+- Full Dialog 1 branch tree ✓ — EN: A1→B3→C2→D1→E1→C3→D2→E2→F1→G1 walked
+  verbatim incl. the E1→C3 loop; CS: A1→B1→C1→D1→E1→C3→D2→E2→F1→G1 +
+  B3 path choices. Z1 refusal fully exercised (canon "Shh, child…" line,
+  no quest granted, no re-offer while standing in the trigger, re-approach
+  re-offers); Z2 choices present at E1/E2/F1 and share the verified
+  zExit/refuseQuest path (pass by code-path equivalence).
+- Six objectives in order ✓ (questProgress 1→7, both runs)
+- Both cottage exits ✓ (sandals→door EN; window leap-out EN + CS)
+- table/futon/papers optionals + futon→shutter-slam chain ✓ (slam fires
+  1.4 s after futon E as audio-only GustStart('lash') pair + camera shake +
+  papers tossed/settled; "Ah!"/"Stupid wind." bubbles; sandals examine is
+  dagger-gated by canon order — confirmed not offered pre-dagger, offered +
+  Remove after)
+- Exact readable fragments EN+CS ✓ (diary 4 fragments + body text verbatim
+  both locales, diacritics clean, no overflow)
+- Dissolve-then-discover ordering ✓ (bow+0.45 → 3.0 s dissolve →
+  GhostDissolved+WindStopped → 3.0 s held quiet → marker → body overlay)
+- The empty shawl ✓ ("In her hands she holds an empty shawl." / "V rukou
+  drží prázdný šátek.")
+- Yanagi onna medallion ✓ (stamp + bloom + 柳女 lore card + 10 prose lines +
+  R/Esc footer, EN + CS)
+Tutorial §8: all 6 beats ✓ (move glyph clears on input; shrine 3 s cutscene
+forces fox + violet whisper; log gap fox-passes/human-blocks; creek Bound
+(water blocks walking); gate crossed-paw → F-hint → F → E opens; scripted
+first gust full telegraph→lash cycle on field entry). Hold-Esc intro skip ✓
+(1 s hold, meter, no stale-Esc pause leak). R restart → fresh boot → title →
+NEW RUN shrine beat re-verified ✓. Esc on ending → title ✓. Pause ✓ (scroll,
+pauseDim, resume, restart=reload). Mute M + persistence across reload ✓.
+CS locale persistence across reload ✓ (kitsune.locale; title boots Čeština).
+
+**AUDIO (human-pace checks)**
+Music states title→exterior→interior→ending all observed live (+ interior
+muffle gain .4/LP, dialog duck .5, diary duck .07 + hum, lullaby cue path on
+the body overlay post-WindStopped, ending through-composed resolve clean).
+Gust swell↔telegraph sync is structural (one wind.state.strength value
+drives shaders AND audio.update) and was metered in M3. Footstep surfaces
+wired per-surface (grass/wood observed via events; mix metered in M3).
+Transform pair fired both directions dozens of times (incl. the →fox whomp).
+wind.stopForever → digital silence verified in RUN1 (strength 0, world
+still). Zero console ERRORS across the entire multi-hour session.
+
+**PLAYTIME / PACING**
+Wall-clock for the full EN run was bot-inflated (~33 min incl. agent
+latency, navigation retries, deliberate double-tests). Subtracting measured
+harness overhead, a first-time human reading everything lands ≈15–18 min;
+skipping some optionals ≈10–13 min — consistent with the 8–15 min target,
+median ~12. Nothing drags: the longest forced wait anywhere is one gust
+cycle (~17–20 s). Finale cutting took ~15 s of waiting total (cut 1 in a
+telegraph window, cuts 2+3 chained in the next calm) — far under the 2.5 min
+ceiling, so NO calm-window tuning was needed (wind.ts untouched).
+
+**Known issues (shipped)**
+1. Shore wedge: a knockdown in the willow-row lash zone can push the player
+   into the corner between willow trunk #2 (12.4,−7.4, r 0.4 collider) and
+   the lake collider; holding SE there yields zero movement until the player
+   steers any other direction (instant self-recovery). Annoying at worst;
+   left untouched at the gate rather than retune shore colliders blind.
+2. Shore draw-call hotspot ~121 scene draws vs ≤120 budget (pre-existing
+   P1 flag) — M5 perf-audit call (cheapest trim: untag 1–2 field-tree
+   occluders).
+3. GameLoop.tick does not reschedule rAF if an update fn throws — any
+   in-loop exception freezes the game permanently. The only observed thrower
+   (audio recipes) is now guarded at the source; the kernel was deliberately
+   left untouched at the final gate. M5 may consider a try/catch around
+   entry.fn as cheap insurance.
+4. One unexplained ~2 min control stall after an intro hold-Esc skip in one
+   scripted CS boot (velocity stayed 0 with valid input/axis while wind,
+   render and UI ran; self-resolved; not reproduced across 3 other
+   boot/skip cycles incl. the full EN run). Suspected harness artifact
+   (synthetic keys + background-tab pump); watch in any human pass.
+5. Finale chaining: branch clusters are close enough that a pre-positioned
+   player can cut 2–3 branches inside ONE calm window — the "intended dance"
+   (one cut per window) is not enforced. Reads as player skill, not a bug;
+   flagged for design awareness.
+6. Ending screen R/Esc + pause Restart remain full page reloads (M1
+   decision, unchanged).

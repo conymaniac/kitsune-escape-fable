@@ -57,6 +57,7 @@ const ui = createUiRoot();
 const hud = createHud(ui.hud);
 const dialogUi = createDialogUi(ui.dialog, bus);
 const screens = createScreens(ui.screens, ui.fade, ui.paper, bus);
+screens.setAudioHooks({ setMasterVolume: (v) => audio.setMasterVolume(v) });
 dialogUi.close();
 
 onLocaleChange((locale) => bus.emit('LocaleChanged', locale));

@@ -138,7 +138,10 @@ export function createSfxEngine(): SfxEngine {
         modulationEnvelope: { attack: 0.002, decay: 0.15, sustain: 0, release: 0.2 },
       }),
     );
-    glissFm.maxPolyphony = 6;
+    // 12, not 6: one transform is a 4-note gliss w/ ~0.45 s tails and F-spam
+    // is a design pillar ("shifting is joy") — two transforms inside half a
+    // second legitimately demand 8+ voices (playtest: 6 dropped notes at 1x).
+    glissFm.maxPolyphony = 12;
     glissFm.connect(io.out);
     glissFm.connect(glissSend);
     sweepHp = own(new Tone.Filter(1000, 'highpass')).connect(io.out);
@@ -182,7 +185,9 @@ export function createSfxEngine(): SfxEngine {
         modulationEnvelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 },
       }),
     );
-    ping.maxPolyphony = 6;
+    // 12: suzu chime = 3 notes w/ 1.4 s tails; transform + pickup + quest
+    // tick can overlap in normal play (playtest: drops at 1x density).
+    ping.maxPolyphony = 12;
     ping.connect(io.out);
     ping.connect(pingSend);
 
@@ -237,7 +242,9 @@ export function createSfxEngine(): SfxEngine {
         envelope: { attack: 0.4, decay: 0.6, sustain: 0.6, release: 2.4 },
       }),
     );
-    sines.maxPolyphony = 6;
+    // 12: →human chord (3 voices, 0.8 s tails) + dissolve trio (2.4 s tails)
+    // — back-to-back F presses alone can exceed 6.
+    sines.maxPolyphony = 12;
     sines.connect(io.out);
     sines.connect(sineSend);
 
@@ -304,6 +311,21 @@ export function createSfxEngine(): SfxEngine {
 
   function play(name: SfxName): void {
     if (!ready) return;
+    // A recipe must NEVER throw into the game loop: mono synths are shared
+    // across recipes (thump: windowLeap+footstepWood; boom: transform/
+    // knockdown/branchCut) and two triggers ≤0.4 s apart can collide on
+    // Tone's timeline ("time must be greater than or equal to the last
+    // scheduled time"). M4 playtest froze the WHOLE game on a wood footstep
+    // during the window leap — GameLoop stops rescheduling after a throw.
+    // Worst case under the guard: one quiet layer of one SFX is skipped.
+    try {
+      playUnsafe(name);
+    } catch {
+      /* dropped sfx layer — never fatal */
+    }
+  }
+
+  function playUnsafe(name: SfxName): void {
     const r = Math.random();
     const t0 = Tone.now() + 0.02;
     switch (name) {
@@ -393,14 +415,18 @@ export function createSfxEngine(): SfxEngine {
 
   function playSlam(): void {
     if (!ready || !slamBoom || !snapNoise || !whooshNoise || !whooshLp) return;
-    const t0 = Tone.now() + 0.02;
-    snapNoise.triggerAttackRelease(0.04, t0, 1);
-    slamBoom.triggerAttackRelease('F1', 0.4, t0, 1);
-    // short dark gust burst behind the bang
-    whooshLp.frequency.cancelScheduledValues(t0);
-    whooshLp.frequency.setValueAtTime(1800, t0);
-    whooshLp.frequency.exponentialRampToValueAtTime(400, t0 + 0.5);
-    whooshNoise.triggerAttackRelease(0.45, t0 + 0.02, 0.9);
+    try {
+      const t0 = Tone.now() + 0.02;
+      snapNoise.triggerAttackRelease(0.04, t0, 1);
+      slamBoom.triggerAttackRelease('F1', 0.4, t0, 1);
+      // short dark gust burst behind the bang
+      whooshLp.frequency.cancelScheduledValues(t0);
+      whooshLp.frequency.setValueAtTime(1800, t0);
+      whooshLp.frequency.exponentialRampToValueAtTime(400, t0 + 0.5);
+      whooshNoise.triggerAttackRelease(0.45, t0 + 0.02, 0.9);
+    } catch {
+      /* dropped sfx layer — never fatal (see play()) */
+    }
   }
 
   function setTransformDirection(form: KitsuneForm): void {
