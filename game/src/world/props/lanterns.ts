@@ -31,7 +31,11 @@ export function makeStoneLantern(kit: MaterialKit): LanternBuild {
     paintVertexColors(g, (x, y, z, out) => {
       const j = 0.76 + 0.4 * noise2(x * 6 + s + seed, y * 4 + z * 6);
       out.setRGB(j * 0.96, j, j * 1.08);
-      if (y < mossTo) out.lerp(tone('inkCharcoal', 'willowDeep'), 0.45 * (1 - y / mossTo));
+      // mossTo = 0 disables moss — guard the division (y/0 → NaN colors
+      // that poisoned the bloom chain: the M2 white-out root cause).
+      if (mossTo > 0 && y < mossTo) {
+        out.lerp(tone('inkCharcoal', 'willowDeep'), 0.45 * (1 - Math.max(y, 0) / mossTo));
+      }
     });
 
   // — one lathe profile: plinth → shaft (waisted) → firebox base —

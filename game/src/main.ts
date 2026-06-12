@@ -417,6 +417,7 @@ loop.start();
 // production builds by the `import.meta.env.DEV` guard).
 if (import.meta.env.DEV) {
   (window as unknown as Record<string, unknown>).__kitsune = {
+    renderer: renderer.gl, // renderer.info for perf verification
     player,
     sceneDir,
     wind,

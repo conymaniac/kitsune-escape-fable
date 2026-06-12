@@ -89,7 +89,7 @@ export function createSfxEngine(): SfxEngine {
     const p = plucks[pluckIdx];
     pluckIdx = (pluckIdx + 1) % plucks.length;
     if (!p) return;
-    p.volume.value = -12 + (vel - 1) * 8;
+    p.volume.value = -9 + (vel - 1) * 8;
     p.triggerAttack(note, time);
   }
 
@@ -112,7 +112,7 @@ export function createSfxEngine(): SfxEngine {
     woodBp.Q.value = 1.2;
     woodNoise = own(
       new Tone.NoiseSynth({
-        volume: -15,
+        volume: -13,
         noise: { type: 'white' },
         envelope: { attack: 0.002, decay: 0.05, sustain: 0, release: 0.03 },
       }),
@@ -129,7 +129,7 @@ export function createSfxEngine(): SfxEngine {
     const glissSend = own(new Tone.Gain(0.35)).connect(io.reverb);
     glissFm = own(
       new Tone.PolySynth(Tone.FMSynth, {
-        volume: -10,
+        volume: -6, // the hero sound — must read clearly over the bed
         harmonicity: 2,
         modulationIndex: 8,
         oscillator: { type: 'sine' },
@@ -144,7 +144,7 @@ export function createSfxEngine(): SfxEngine {
     sweepHp = own(new Tone.Filter(1000, 'highpass')).connect(io.out);
     sweepNoise = own(
       new Tone.NoiseSynth({
-        volume: -14,
+        volume: -11,
         noise: { type: 'white' },
         envelope: { attack: 0.03, decay: 0.32, sustain: 0, release: 0.1 },
       }),
@@ -173,7 +173,7 @@ export function createSfxEngine(): SfxEngine {
     const pingSend = own(new Tone.Gain(0.5)).connect(io.reverb);
     ping = own(
       new Tone.PolySynth(Tone.FMSynth, {
-        volume: -16,
+        volume: -8, // velocities scale it back down where faintness is wanted
         harmonicity: 5.7,
         modulationIndex: 16,
         oscillator: { type: 'sine' },
@@ -204,7 +204,7 @@ export function createSfxEngine(): SfxEngine {
     whooshLp = own(new Tone.Filter(2400, 'lowpass')).connect(io.out);
     whooshNoise = own(
       new Tone.NoiseSynth({
-        volume: -12,
+        volume: -7,
         noise: { type: 'pink' },
         envelope: { attack: 0.08, decay: 0.38, sustain: 0, release: 0.12 },
       }),
@@ -241,10 +241,12 @@ export function createSfxEngine(): SfxEngine {
     sines.connect(io.out);
     sines.connect(sineSend);
 
-    // dialogBlip: 25 ms sine ~1200 ±50 Hz at −18 dB
+    // dialogBlip: 25 ms sine ~1200 ±50 Hz — quiet tick under the typewriter
+    // (spec said −18 dB, but a bare 1.2 kHz sine reads HOT next to the
+    // filtered/FM voices; −23 lands it under the one-shot SFX in practice)
     blip = own(
       new Tone.Synth({
-        volume: -18,
+        volume: -23,
         oscillator: { type: 'sine' },
         envelope: { attack: 0.002, decay: 0.022, sustain: 0, release: 0.02 },
       }),
@@ -276,10 +278,11 @@ export function createSfxEngine(): SfxEngine {
   function playTransform(t0: number): void {
     if (!glissFm || !sweepNoise || !sweepHp || !ping || !sines || !rustleNoise) return;
     if (toForm === 'fox') {
-      // low whomp rising gliss D–G–A–D′ + bell shimmer + swept noise 1→8 kHz
+      // low whomp + rising gliss D–G–A–D′ + bell shimmer + swept noise 1→8 kHz
+      boom?.triggerAttackRelease('D2', 0.22, t0, 0.55); // the whomp (DESIGN §2)
       const notes = ['D4', 'G4', 'A4', 'D5'] as const;
       notes.forEach((n, i) => {
-        glissFm?.triggerAttackRelease(n, 0.14, t0 + i * 0.055, 0.7 - i * 0.06);
+        glissFm?.triggerAttackRelease(n, 0.14, t0 + i * 0.055, 0.85 - i * 0.07);
       });
       sweepHp.frequency.cancelScheduledValues(t0);
       sweepHp.frequency.setValueAtTime(1000, t0);
@@ -294,8 +297,8 @@ export function createSfxEngine(): SfxEngine {
         glissFm?.triggerAttackRelease(n, 0.14, t0 + i * 0.055, 0.65 - i * 0.05);
       });
       sines.set({ envelope: { attack: 0.06, release: 0.8 } });
-      sines.triggerAttackRelease(['D4', 'G4', 'A4'], 0.5, t0 + 0.05, 0.35);
-      rustleNoise.triggerAttackRelease(0.3, t0 + 0.04, 0.6);
+      sines.triggerAttackRelease(['D4', 'G4', 'A4'], 0.5, t0 + 0.05, 0.5);
+      rustleNoise.triggerAttackRelease(0.3, t0 + 0.04, 0.7);
     }
   }
 
@@ -314,7 +317,7 @@ export function createSfxEngine(): SfxEngine {
         if (!woodBp || !woodNoise || !thump) return;
         woodBp.frequency.value = 400 * (0.9 + r * 0.2);
         woodNoise.triggerAttackRelease(0.05, t0, 0.45 + r * 0.15);
-        thump.triggerAttackRelease(90 * (0.95 + r * 0.1), 0.09, t0, 0.5);
+        thump.triggerAttackRelease(90 * (0.95 + r * 0.1), 0.09, t0, 0.65);
         return;
       }
       case 'transform':
@@ -378,9 +381,11 @@ export function createSfxEngine(): SfxEngine {
         return;
       }
       case 'suzuBell': {
-        // small high bell ding-shimmer (quest tick)
-        ping?.triggerAttackRelease('A6', 0.25, t0, 0.55);
-        ping?.triggerAttackRelease('E7', 0.2, t0 + 0.08, 0.4);
+        // small high bell ding-shimmer (quest tick) — the banner chime
+        // must read over the bed (DESIGN §7 juice item 7)
+        ping?.triggerAttackRelease('A6', 0.3, t0, 0.85);
+        ping?.triggerAttackRelease('E7', 0.25, t0 + 0.08, 0.6);
+        ping?.triggerAttackRelease('A7', 0.2, t0 + 0.05, 0.35);
         return;
       }
     }

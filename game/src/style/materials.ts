@@ -61,6 +61,14 @@ const SOFT_RAMP_KEYS: ReadonlySet<PaletteKey> = new Set<PaletteKey>([
   'thatchStraw',
 ]);
 
+/**
+ * Keys that default to wind sway. Foliage geometry carries aSwayWeight
+ * (B-world authors it: willow curtains, reeds, grass — thick wood gets
+ * weight 0); meshes without the attribute read 0 and stay rigid, so the
+ * default is safe for every willowGreen user.
+ */
+const SWAY_KEYS: ReadonlySet<PaletteKey> = new Set<PaletteKey>(['willowGreen']);
+
 // ─────────────────────────────────────────────────────── sky shader ──
 
 const SKY_VERT = /* glsl */ `
@@ -82,7 +90,8 @@ varying vec3 vDir;
 ${GLSL_NOISE_COMMON}
 
 void main() {
-  float h = clamp(vDir.y, -0.08, 1.0);
+  float hRaw = vDir.y;
+  float h = clamp(hRaw, -0.08, 1.0);
   // indigo night gradient: horizon band → mid indigo → deep zenith
   vec3 col = mix(uHorizon, uMid, smoothstep(0.0, 0.22, h));
   col = mix(col, uZenith, smoothstep(0.2, 0.65, h));
@@ -94,6 +103,10 @@ void main() {
   col += uMoonGlow * m * 0.16;
   // horizon breath just above the treeline
   col += uHorizon * smoothstep(0.2, 0.0, abs(h - 0.03)) * 0.22;
+  // below the treeline the dome melts into deep night — the iso camera
+  // looks past the map edge into the lower bowl; without this it holds
+  // the horizon band and reads as a washed lavender void.
+  col = mix(col, uZenith, smoothstep(-0.05, -0.28, hRaw));
   gl_FragColor = vec4(col, 1.0);
 }
 `;
@@ -154,7 +167,7 @@ export function createMaterialKit(): KitsuneMaterialKit {
           mat.emissive.setHex(palette[opts.emissiveKey]);
           mat.emissiveIntensity = opts.emissiveIntensity ?? 1;
         }
-        if (opts.sway) injectSway(mat);
+        if (opts.sway ?? SWAY_KEYS.has(colorKey)) injectSway(mat);
         return mat;
       });
     },

@@ -41,17 +41,18 @@ Branch: `claude/wonderful-mclean-bad83d`. New app: `game/`. CLEAN-ROOM: never to
 - [ ] COMMIT M1
 
 ## M2 — Art pass (parallel: A-style, B-world, C-chars)
-- [ ] A-style: ramps.ts, real materials.ts, shaders/* (water, sway, ghost, wisp, chunks),
-      lighting.ts, postfx.ts
+- [x] A-style: ramps.ts, real materials.ts, shaders/* (water, sway, ghost, wisp, chunks),
+      lighting.ts, postfx.ts — finished + browser-verified after interrupted-WIP audit;
+      postfx white-out root-caused and fixed (see M2 A-style notes)
 - [ ] B-world: real props (terrain, water, willow w/ cuttable branches, cottage, vegetation,
       lanterns, interior props, sky/moon/stars, wisps), merge.ts
 - [ ] C-chars: real mizumiHuman/mizumiFox/yanagi meshes + procedural anim, ink hulls, vfx.ts
 - [ ] COMMIT M2
 
 ## M3 — Audio pass (parallel with M2)
-- [ ] audio/engine.ts real (Tone bootstrap, buses, duck, mute)
-- [ ] audio/music.ts (D insen BGM states + lullaby + wind ambience)
-- [ ] audio/sfx.ts (~13 recipes)
+- [x] audio/engine.ts real (Tone bootstrap, buses, duck, mute)
+- [x] audio/music.ts (D insen BGM states + lullaby + wind ambience)
+- [x] audio/sfx.ts (~13 recipes)
 - [ ] COMMIT M3
 
 ## M4 — Juice & polish
@@ -431,6 +432,106 @@ i18n/en.ts + cs.ts (+3 keys each, parity kept: `whisper.mask`, `cut.1`, `cut.2`
   flags → shrine beat + Dialog 1 re-offer work again ✓ CS: live L-toggle
   mid-dialog re-renders choices, Dialog 1 CS lines verbatim, title "Nářek pod
   vrbou" ✓. tsc + vite build green; purity grep clean.
+
+### M2 A-style — notes (2026-06-12)
+A first A-style agent was interrupted mid-work; its WIP (ramps, materials,
+shaders, lighting, postfx) was AUDITED, fixed and browser-verified by a second
+agent. Audit verdict: structurally complete and spec-shaped (bloom .85/.35/.4,
+half-res mips, MSAA half-float target, grade=vignette+grain+indigo lift,
+5-light exterior rig w/ one 1024² PCF map, shared uniform holders, opacity
+proxies on ghost/wisp) — but it shipped with the postfx white-out.
+- **WHITE-OUT ROOT CAUSE (not postfx config):** NaN vertex data feeding the
+  bloom chain. (1) `lanterns.ts paintStone` divided by `mossTo = 0` for the
+  firebox posts (`1 − y/0` → −Inf → NaN vertex colors on 12 verts × 8
+  lanterns); (2) `meshUtils.noisyLathe` finial profile returns radius 0 at
+  t=0 → degenerate ring → zero-length normals → `normalize(0)` = NaN in GLSL.
+  NaN is immune to the bloom threshold (`smoothstep(NaN)=NaN`) and the mip
+  blur smears it into a screen-covering white blob; the direct render path
+  clamps to the canvas and shows nothing. Diagnosed by pass/threshold/object
+  bisection in the browser + CPU-side attribute scan. Fixed at the source
+  (guarded moss lerp; lathe radius clamped ≥4 mm) — two surgical lines in
+  B-world files, flagged here for B-world review.
+- **Postfx hardened (style-owned):** bloom high-pass now zeroes non-finite
+  texels and caps radiance at 8.0 — content bugs can never white the frame
+  again. Grain 0.02→0.015.
+- **Second color bug:** `renderer.setClearColor` converts for the SCREEN at
+  call time, so the composer's linear buffer received sRGB-encoded clear
+  values → OutputPass re-encoded them (washed-lavender void past map edges).
+  Fixed by setting `scene.background` in both light rigs (WebGLBackground
+  converts per bound render target). Sky dome below-horizon now also melts
+  to zenith-deep (it held the horizon band and read lavender at iso angles).
+- **Lighting (physical falloff, r165+):** window PointLight 14→4.5, moved
+  1.7 u clear of the wall (was 0.58 u → ~40× radiance → bloom fireball);
+  lantern 7→5, decay 2; rim 0.32→0.24. Water grade deepened (centre stays
+  lakeDeep; shore ring 1.3×/0.55 → 1.12×/0.38).
+- **Sway hookup completed:** B-world authors aSwayWeight but never passed
+  `sway: true` — willowGreen toon materials now default to sway injection
+  (inert without the attribute). 9 exterior meshes sway (curtains, reeds,
+  grass heads); `faceted()` no longer spams toNonIndexed warnings.
+- **VERIFY (vite dev, browser screenshots, zero console errors):** title
+  diorama ✓ spawn glade ✓ willow shore + teal wisps + ghost ✓ cottage w/
+  gentle shoji bloom ✓ interior warm rig ✓ postfx enabled everywhere;
+  deep-indigo night, no white-out, no grey wash. tsc + vite build green;
+  purity grep clean.
+- **Perf (exterior willow view, pixelRatio 1.75):** 165 draw calls total
+  incl. ~16 composer fullscreen passes → ~148 scene draws vs ≤120 budget
+  (mostly the 8 un-merged stone-lantern groups — B-world merge scope);
+  interior ~86 vs ≤60 (C-chars avatar part count). Tris 71.9k / 2.3k —
+  far under 150k. Flagged for the M5 perf audit, not fixed here.
+
+### M3 F-audio — notes (2026-06-12)
+A first F-audio agent was interrupted mid-work; its WIP (engine.ts buses,
+music.ts insen score, sfx.ts recipes) was AUDITED, finished and browser-
+verified by a second agent. Audit verdict: the WIP was structurally complete
+and correct — every spec item present (unlock-on-gesture, master→{music,sfx,
+ambience} buses, −6 dB dialog duck + ≈−23 dB diary duck, persisted M-mute,
+shared 2.8 s reverb send, 72 BPM 26-bar D-insen loop with FM-piano motif/
+seeded graces, Karplus-Strong koto, pad, root–fifth drone, title/exterior/
+interior/ending states w/ 1.8 s crossfades, WindStopped holdSilence, music-box
+lullaby + diary hum, pink-noise→dual-bandpass wind ambience, all 13 SfxName
+recipes + playSlam + per-direction transform). main.ts wiring was already
+complete — NOT touched.
+- **Audit fixes (all in audio/, stream-F-owned):** (1) MIX — isolated
+  Tone.Meter metering showed dialogBlip (−24 dB) louder than the hero
+  transform (−27 dB) and suzuBell nearly inaudible (−42 dB): blip −18→−23
+  (deliberate deviation from spec's −18 — bare 1.2 kHz sine reads hot),
+  gliss FM −10→−6, sweep −14→−11, ping −16→−8 (+3rd suzu partial), wood
+  noise −15→−13 + hotter thump, whoosh −12→−7, plucks −12→−9, music box
+  −10→−7. (2) RECIPE GAP — the →fox transform had no "low whomp" (DESIGN §2):
+  added MembraneSynth D2 at burst start; →fox now meters at parity with
+  →human (−24.7 vs −24). (3) DEV taps — music.debug() (state/voice gains/
+  wind values) + __kitsuneAudio.nodes() for scripted meter taps (DEV-only).
+- **VERIFY (vite dev + scripted browser, zero console errors, zero
+  AudioContext warnings):** first keypress unlocks (context running,
+  transport started, 72 BPM, title gains up; uiConfirm from the unlock
+  keypress flushes via the pendingSfx buffer) ✓ intro→play crossfades to
+  exterior ✓ EnterInterior → interior gains (piano 0, kotoMotif .85) +
+  ambience muffle (gain .4 / LP 900 Hz); ExitInterior restores ✓ indoor
+  GustStart('lash') = shutter-slam one-shot, −13 dB the hottest moment ✓
+  gust telegraph→lash ambience swell metered (calm .034 → telegraph .10 →
+  lash .47 @ ~800 Hz + howl band, decay back to .02) ✓ footsteps: 8 grass
+  steps / 7.9 m cadence wired via Footstep(surface) ✓ transform F both
+  directions ✓ dialog duck .5 on DialogStarted, 1.0 on DialogEnded; diary
+  duck .07 + faint hum; restore on close ✓ 12 rapid dialogBlips — throttled,
+  no errors ✓ M mute: master→0, kitsune.muted='1', persists across reload
+  (HUD "Ztlumeno" pre-gesture), M unmutes ✓ wind.stopForever(): strength→0,
+  all voice gains→0, ambience→0, master floor −299 dBFS (digital silence,
+  the payoff); setState while held correctly refused ✓ PaperOverlayOpened
+  post-WindStopped → music-box lullaby cue ✓ setState('ending') → loop parts
+  muted, transport paused, through-composed D-minor→D-major resolve plays ✓
+  26-bar loop wrapped at accelerated BPM with zero scheduling errors (clean
+  seam — voices ring across the boundary) ✓. Mix: worst-case master peak
+  −13 dB (slam), bed ~−27, ambience floor −55 calm — no clipping anywhere.
+  tsc + vite build green; purity grep clean (zero audio files, full
+  synthesis).
+- **Open issues / handoffs:** pause-menu volume slider still a visual
+  placeholder — screens.ts (E-ui-owned) exposes no hook; AudioHandle.
+  setMasterVolume(v01) is ready and waiting (M4-P2). Ambience continues at
+  its last level while the loop is paused (Transport keeps running under
+  the pause scroll — acceptable, M4 may duck it). Headless-tab note for
+  scripted verification: rAF parks between bursts — patch rAF to setTimeout
+  AND force one frame (screenshot) before timing-sensitive checks; loop-
+  driven key handling (M, F) queues until frames tick.
 
 ### M0 notes / deviations
 - EN quest title authored as "Cry under the Willow" per build order; canon EN doc's

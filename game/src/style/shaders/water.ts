@@ -73,8 +73,9 @@ void main() {
   float n2 = ksFbm2(vWorld.xz * 1.55 - drift * 1.7 + 31.7) * amp;
   float surf = n * 0.62 + n2 * 0.38;
 
-  // depth gradient: deep indigo centre → cold teal shallows
-  vec3 col = mix(uDeep, uShallow, smoothstep(0.2, 1.0, shore + (surf - 0.5) * 0.3));
+  // depth gradient: deep indigo centre → cold teal shallows (the centre
+  // stays night-deep — the lake must not read as a bright day pool)
+  vec3 col = mix(uDeep, uShallow, smoothstep(0.45, 1.08, shore + (surf - 0.5) * 0.25));
 
   // toon-stepped highlight bands (fake-normal glints quantised to 2 steps)
   float b1 = step(0.62, surf);
@@ -90,9 +91,9 @@ void main() {
   float sparkle = pow(max(surf * 1.3 - 0.42, 0.0), 3.0);
   col += uGlint * streak * sparkle * 1.7;
 
-  // shore ring: lightening + a broken lap line just inside the rim
-  float ring = smoothstep(0.82, 0.97, shore);
-  col = mix(col, uShallow * 1.3, ring * 0.55);
+  // shore ring: gentle lightening + a broken lap line just inside the rim
+  float ring = smoothstep(0.86, 0.985, shore);
+  col = mix(col, uShallow * 1.12, ring * 0.38);
   float lap = step(0.9 + (surf - 0.5) * 0.08, shore) * (1.0 - step(0.975, shore));
   col = mix(col, uGlint * 0.85, lap * 0.3);
 

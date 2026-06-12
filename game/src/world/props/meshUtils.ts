@@ -115,6 +115,11 @@ export function paintJitter(
 
 /** De-index + flat normals — faceted look without a flatShading material. */
 export function faceted(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  if (geometry.index === null) {
+    // already non-indexed — recompute flat normals in place
+    geometry.computeVertexNormals();
+    return geometry;
+  }
   const flat = geometry.toNonIndexed();
   flat.computeVertexNormals();
   geometry.dispose();
@@ -245,7 +250,9 @@ export function noisyLathe(
   for (let r = 0; r <= rings; r += 1) {
     const t = r / rings;
     const y = t * height;
-    const radius = profile(t);
+    // Clamp away zero-radius rings: they collapse to a point → degenerate
+    // triangles → zero-length normals → NaN lighting (white-out via bloom).
+    const radius = Math.max(profile(t), 0.004);
     const leanX = lean * t * t * height;
     for (let s = 0; s <= segments; s += 1) {
       const a = (s / segments) * Math.PI * 2;

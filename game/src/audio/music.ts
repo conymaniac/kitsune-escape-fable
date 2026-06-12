@@ -51,6 +51,13 @@ export interface MusicEngine {
   holdSilence(): void;
   update(dt: number, windStrength: number): void;
   dispose(): void;
+  /** DEV inspection: live state + voice/wind gain values (cheap reads). */
+  debug(): {
+    state: MusicState;
+    silenceHeld: boolean;
+    gains: { piano: number; koto: number; kotoMotif: number; pad: number; drone: number };
+    wind: { gain: number; freq: number; howlGain: number };
+  };
 }
 
 // ── tiny seeded PRNG so decorations loop composed, not random ──
@@ -329,7 +336,7 @@ export function createMusicEngine(): MusicEngine {
     boxGain.connect(boxSend);
     musicBox = own(
       new Tone.PolySynth(Tone.FMSynth, {
-        volume: -10,
+        volume: -7, // the reveal cue — fragile, but it must carry the scene
         harmonicity: 3.99,
         modulationIndex: 12,
         oscillator: { type: 'sine' },
@@ -548,5 +555,34 @@ export function createMusicEngine(): MusicEngine {
     buses = null;
   }
 
-  return { bootstrap, setState, playLullaby, startHum, stopHum, holdSilence, update, dispose };
+  function debug(): ReturnType<MusicEngine['debug']> {
+    return {
+      state,
+      silenceHeld,
+      gains: {
+        piano: pianoGain?.gain.value ?? -1,
+        koto: kotoGain?.gain.value ?? -1,
+        kotoMotif: kotoMotifGain?.gain.value ?? -1,
+        pad: padGain?.gain.value ?? -1,
+        drone: droneGain?.gain.value ?? -1,
+      },
+      wind: {
+        gain: windGain?.gain.value ?? -1,
+        freq: Number(windBand?.frequency.value ?? -1),
+        howlGain: howlGain?.gain.value ?? -1,
+      },
+    };
+  }
+
+  return {
+    bootstrap,
+    setState,
+    playLullaby,
+    startHum,
+    stopHum,
+    holdSilence,
+    update,
+    dispose,
+    debug,
+  };
 }

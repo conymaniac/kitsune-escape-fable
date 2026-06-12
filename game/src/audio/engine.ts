@@ -190,6 +190,8 @@ export function createAudio(bus: EventBus): AudioHandle {
       tone: Tone,
       music,
       sfx,
+      /** Live node refs for scripted meter taps (null pre-init). */
+      nodes: () => ({ master, duckGain, ambGain, ambFilter }),
       state: () => ({
         context: Tone.getContext().state,
         transport: Tone.getTransport().state,

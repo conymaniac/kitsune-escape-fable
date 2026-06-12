@@ -41,7 +41,7 @@ const GradeShader = {
     /** Additive indigo lift in the deepest shadows (ink-wash floor). */
     uShadowLift: { value: new THREE.Color(palette.nightIndigo).multiplyScalar(0.055) },
     uVignetteStrength: { value: 0.42 },
-    uGrain: { value: 0.02 },
+    uGrain: { value: 0.015 },
   },
   vertexShader: /* glsl */ `
 varying vec2 vUv;
@@ -83,6 +83,8 @@ export interface PostFx {
   resize(width: number, height: number): void;
   /** Fallback: false = plain renderer.render (no bloom/vignette). */
   setEnabled(enabled: boolean): void;
+  /** Dev introspection (pass toggling from the console). */
+  readonly passes: { bloom: UnrealBloomPass; grade: ShaderPass; output: OutputPass };
   dispose(): void;
 }
 
@@ -110,6 +112,21 @@ export function createPostFx(renderer: THREE.WebGLRenderer): PostFx {
     BLOOM_RADIUS,
     BLOOM_THRESHOLD,
   );
+
+  // Harden the bloom high-pass. Any non-finite fragment in the scene
+  // (NaN vertex colors, zero-length normals → NaN lighting) would smear
+  // through the mip blur into a screen-covering white blob — and NaN is
+  // immune to the luminance threshold. Kill non-finite texels and cap
+  // radiance so no single hotspot can wash the frame, whatever the
+  // content streams feed us.
+  const highPass = bloomPass.materialHighPassFilter;
+  highPass.fragmentShader = highPass.fragmentShader.replace(
+    'vec4 texel = texture2D( tDiffuse, vUv );',
+    /* glsl */ `vec4 texel = texture2D( tDiffuse, vUv );
+      if (any(isnan(texel)) || any(isinf(texel))) texel = vec4(0.0);
+      texel.rgb = min(texel.rgb, vec3(8.0));`,
+  );
+  highPass.needsUpdate = true;
   const gradePass = new ShaderPass(GradeShader);
   const outputPass = new OutputPass();
 
@@ -121,6 +138,8 @@ export function createPostFx(renderer: THREE.WebGLRenderer): PostFx {
   let enabled = true;
 
   return {
+    passes: { bloom: bloomPass, grade: gradePass, output: outputPass },
+
     setScene(nextScene: THREE.Scene, nextCamera: THREE.Camera): void {
       scene = nextScene;
       camera = nextCamera;

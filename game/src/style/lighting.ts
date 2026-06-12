@@ -44,14 +44,23 @@ export interface InteriorRig {
 // Exterior anchor points (FINAL world data — see world/exterior.ts):
 // cottage window plane sits at (-21.48, 1.3, -20.5) facing east; the
 // promontory stone lantern stands at (15, 0, -13.8), core at y 0.86.
-const WINDOW_POS = new THREE.Vector3(-20.9, 1.5, -20.5);
+// Lights are PHYSICAL (intensity/d² since r165) — keep them well clear of
+// geometry or the nearest surface gets 10-40× radiance and bloom torches
+// the frame. The window light floats 1.7 u east of the wall plane.
+const WINDOW_POS = new THREE.Vector3(-19.8, 1.15, -20.5);
 const LANTERN_POS = new THREE.Vector3(15, 1.05, -13.8);
 
-const WINDOW_INTENSITY = 14;
-const LANTERN_INTENSITY = 7;
+const WINDOW_INTENSITY = 4.5;
+const LANTERN_INTENSITY = 5;
 
 /** Build the exterior night rig into the scene; returns live handles. */
 export function makeExteriorRig(scene: THREE.Scene): ExteriorRig {
+  // Background: scene.background converts per render target (linear into
+  // the postfx HDR buffer, sRGB on screen). renderer.setClearColor alone
+  // encodes for the screen at call time → double-encodes through the
+  // composer's OutputPass (washed lavender instead of deep night).
+  scene.background = new THREE.Color(palette.nightDeep);
+
   // 1 — moon key with the single shadow map
   const moon = new THREE.DirectionalLight(palette.moonlight, 1.2);
   moon.castShadow = true;
@@ -71,17 +80,17 @@ export function makeExteriorRig(scene: THREE.Scene): ExteriorRig {
   scene.add(hemi);
 
   // 3 — warm rim from the cottage quarter (NW), shadowless
-  const rim = new THREE.DirectionalLight(palette.lanternAmber, 0.32);
+  const rim = new THREE.DirectionalLight(palette.lanternAmber, 0.24);
   rim.position.set(-30, 9, -26);
   scene.add(rim, rim.target);
 
   // 4 — the shoji window pool
-  const windowLight = new THREE.PointLight(palette.shojiGlow, WINDOW_INTENSITY, 10, 1.8);
+  const windowLight = new THREE.PointLight(palette.shojiGlow, WINDOW_INTENSITY, 9, 2);
   windowLight.position.copy(WINDOW_POS);
   scene.add(windowLight);
 
   // 5 — the promontory stone lantern pool
-  const lanternLight = new THREE.PointLight(palette.lanternAmber, LANTERN_INTENSITY, 7, 1.9);
+  const lanternLight = new THREE.PointLight(palette.lanternAmber, LANTERN_INTENSITY, 7, 2);
   lanternLight.position.copy(LANTERN_POS);
   scene.add(lanternLight);
 
@@ -127,6 +136,9 @@ const INT_LANTERN_INTENSITY = 10;
 
 /** Build the intimate interior rig; warm low key + cool fill. */
 export function makeInteriorRig(scene: THREE.Scene): InteriorRig {
+  // per-target-correct clear (see makeExteriorRig)
+  scene.background = new THREE.Color(palette.nightDeep);
+
   // warm paper-lantern key, low to the floor — long cosy falloff
   const lantern = new THREE.PointLight(palette.lanternAmber, INT_LANTERN_INTENSITY, 13, 1.6);
   lantern.position.copy(INT_LANTERN_POS);
